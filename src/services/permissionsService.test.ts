@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest'
+import { hasPermission, isAccessActive } from './permissionsService'
+import type { TeamAccess } from '../types/domain'
+const a: TeamAccess = {
+  userTeamAccessId: 'u_t',
+  userId: 'u',
+  teamId: 't',
+  status: 'ACTIVE',
+  rolePermissions: {
+    coach: { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
+  },
+}
+describe('permissions', () => {
+  it('refuse par défaut', () =>
+    expect(
+      hasPermission([a], {
+        userId: 'u',
+        teamId: 't',
+        activeRoleId: 'coach',
+        permissionKey: 'players.write',
+      }),
+    ).toBe(false))
+  it('respecte le rôle actif', () =>
+    expect(
+      hasPermission([a], {
+        userId: 'u',
+        teamId: 't',
+        activeRoleId: 'coach',
+        permissionKey: 'players.read',
+      }),
+    ).toBe(true))
+  it('refuse un accès expiré', () =>
+    expect(
+      isAccessActive(
+        { ...a, endDate: new Date('2025-01-01') },
+        new Date('2026-01-01'),
+      ),
+    ).toBe(false))
+})

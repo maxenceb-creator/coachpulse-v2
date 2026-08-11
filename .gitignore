@@ -9,4 +9,7 @@ coverage/
 functions/lib/
 functions/node_modules/
 *.log
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 .DS_Store

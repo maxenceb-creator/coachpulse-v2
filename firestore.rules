@@ -2,8 +2,39 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // DENY BY DEFAULT.
-    // Les règles détaillées seront ajoutées par domaine avec tests Emulator.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function activeUser() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'ACTIVE';
+    }
+
+    function access(teamId) {
+      return get(/databases/$(database)/documents/userTeamAccess/$(request.auth.uid + '_' + teamId));
+    }
+
+    function can(teamId, roleId, permission) {
+      return activeUser()
+        && access(teamId).data.status == 'ACTIVE'
+        && access(teamId).data.rolePermissions[roleId].permissions.hasAny([permission]);
+    }
+
+    match /users/{userId} {
+      allow read: if activeUser() && request.auth.uid == userId;
+    }
+
+    match /roles/{roleId} {
+      allow read: if activeUser()
+        && roleId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleIds;
+    }
+
+    match /userTeamAccess/{accessId} {
+      allow read: if activeUser() && resource.data.userId == request.auth.uid;
+    }
+    // Les collections métier restent fermées tant que le rôle actif vérifiable
+    // n'est pas transmis par une commande serveur ou un mécanisme validé.
     match /{document=**} {
       allow read, write: if false;
     }
