@@ -1,1 +1,9 @@
-export const keys={user:(u:string)=>['user',u]as const,roles:(r:string[])=>['roles',...r]as const,access:(u:string)=>['access',u]as const,teams:(u:string,r:string)=>['teams',u,r]as const,season:['season','active']as const,count:(t:string,s:string,r:string)=>['players','count',t,s,r]as const}
+export const keys = {
+  user: (u: string) => ['user', u] as const,
+  roles: (r: string[]) => ['roles', ...r] as const,
+  access: (u: string) => ['access', u] as const,
+  teams: (u: string, r: string) => ['teams', u, r] as const,
+  season: ['season', 'active'] as const,
+  count: (t: string, s: string, r: string) =>
+    ['players', 'count', t, s, r] as const,
+}
