@@ -37,7 +37,7 @@ Après contrôle de la liste des documents :
 npm run seed:dev
 ```
 
-Le seed vérifie que l'UID existe dans Firebase Authentication et que son email correspond à `DEV_AUTH_EMAIL`. Il réalise ensuite des upserts déterministes avec Firebase Admin SDK.
+Le seed vérifie que l'UID existe dans Firebase Authentication et que son email correspond à `DEV_AUTH_EMAIL`. Il remplace ensuite intégralement chaque document déterministe qu'il gère avec Firebase Admin SDK. Un ancien champ absent du dataset courant ne peut donc pas survivre, notamment `seasonId` ou `categoryId` sur la FIRST_TEAM.
 
 ## Résultat attendu
 
@@ -47,6 +47,6 @@ Après démarrage de l'application, le compte permet de tester le Dashboard, le 
 
 ## Relancer sans risque
 
-Les IDs sont stables et le script utilise des upserts : une relance met à jour les mêmes documents sans doublon. Il ne supprime aucune collection ni aucun document. Les documents DEV ciblés sont listés dans la sortie.
+Les IDs sont stables : une relance remplace les mêmes documents sans doublon. Il ne supprime aucune collection ni aucun document, et ne touche pas aux documents dont les IDs ne figurent pas dans son dataset. Les documents DEV ciblés sont listés dans la sortie.
 
 La garde est stricte : toute valeur absente ou différente de `DEV_FIREBASE_PROJECT_ID=coachpulse-v2-dev`, y compris un projectId PROD, arrête le script avant toute initialisation Firebase.

@@ -12,6 +12,7 @@ import {
   buildBootstrapDataset,
   seedEntries,
 } from './bootstrapData.js'
+import { queueDocumentReplacement } from './seedWriteStrategy.js'
 
 const dryRun = process.argv.includes('--dry-run')
 const projectId = process.env.DEV_FIREBASE_PROJECT_ID
@@ -29,7 +30,7 @@ const entries = seedEntries(dataset)
 if (dryRun) {
   console.log(`[DRY RUN] Projet validé : ${projectId}`)
   for (const entry of entries)
-    console.log(`[DRY RUN] UPSERT ${entry.collection}/${entry.id}`)
+    console.log(`[DRY RUN] REPLACE ${entry.collection}/${entry.id}`)
   console.log(`[DRY RUN] ${entries.length} documents validés, aucune écriture.`)
   process.exit(0)
 }
@@ -56,10 +57,9 @@ writer.onWriteError((error) => {
   return error.failedAttempts < 3
 })
 for (const entry of entries) {
-  writer.set(firestore.collection(entry.collection).doc(entry.id), entry.data, {
-    merge: true,
-  })
-  console.log(`UPSERT ${entry.collection}/${entry.id}`)
+  const reference = firestore.collection(entry.collection).doc(entry.id)
+  queueDocumentReplacement(writer.set.bind(writer), reference, entry.data)
+  console.log(`REPLACE ${entry.collection}/${entry.id}`)
 }
 await writer.close()
 console.log(

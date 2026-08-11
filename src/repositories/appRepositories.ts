@@ -29,16 +29,17 @@ export const repositories = {
       : Promise.resolve([]),
   activeSeason: () =>
     many('seasons', seasonSchema, [where('isActive', '==', true)]),
-  async playerCount(teamId: string, seasonId: string) {
-    const a = await many('playerTeamAssignments', assignmentSchema, [
+  assignmentsForTeam: (teamId: string, seasonId: string) =>
+    many('playerTeamAssignments', assignmentSchema, [
       where('teamId', '==', teamId),
       where('seasonId', '==', seasonId),
       where('status', '==', 'ACTIVE'),
-    ])
-    const ids = [...new Set(a.map((x) => x.playerId))]
-    if (!ids.length) return 0
-    const groups = Array.from({ length: Math.ceil(ids.length / 30) }, (_, i) =>
-      ids.slice(i * 30, i * 30 + 30),
+    ]),
+  async activePlayerCount(playerIds: string[]) {
+    if (!playerIds.length) return 0
+    const groups = Array.from(
+      { length: Math.ceil(playerIds.length / 30) },
+      (_, i) => playerIds.slice(i * 30, i * 30 + 30),
     )
     return (
       await Promise.all(
