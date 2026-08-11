@@ -55,3 +55,22 @@ Player
 ↓
 Dashboard simple
 ```
+
+## Installation et lancement
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Renseigner dans `.env.local` les six variables Firebase Web listées dans `.env.example`. Ce fichier est ignoré par Git. Le projet Firebase CLI de développement est `coachpulse-v2-dev` via l’alias `dev`.
+
+## Validation
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
