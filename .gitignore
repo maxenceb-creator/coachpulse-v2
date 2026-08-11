@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.firebase/
+.env
+.env.*
+!.env.example
+coverage/
+.vite/
+functions/lib/
+functions/node_modules/
+*.log
+.DS_Store
