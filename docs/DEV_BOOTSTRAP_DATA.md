@@ -53,7 +53,7 @@ versionnées (Jongles, Sprint 20 m, Cooper) et six TestBenchmark TARGET U13/U14.
 Après démarrage de l'application, le compte permet de tester le Dashboard, le
 changement de rôle, les Teams accessibles, la saison active, le nombre de
 joueuses par Team et la page `/tests`. Le rôle Coach principal possède un
-TeamAccess sur U13F et U14F avec `tests.read` ; l'équipe première reste réservée
+TeamAccess sur U13F et U14F avec `tests.read` et `tests.write` ; l'équipe première reste réservée
 au rôle Admin dans ce dataset.
 
 ## Relancer sans risque

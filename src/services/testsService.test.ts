@@ -5,6 +5,7 @@ import {
   createTestsService,
   isTargetReached,
   TestsDomainError,
+  validateTestValues,
   validateBenchmarkCompatibility,
 } from './testsService'
 
@@ -51,10 +52,28 @@ const accesses: TeamAccess[] = [
     teamId: 'team',
     status: 'ACTIVE',
     rolePermissions: {
-      coach: { permissions: ['tests.read'], medicalAccessLevel: 'NONE' },
+      coach: {
+        permissions: ['tests.read', 'tests.write'],
+        medicalAccessLevel: 'NONE',
+      },
     },
   },
 ]
+
+const repositoryMock = () => ({
+  getActiveDefinitions: vi.fn().mockResolvedValue([definition]),
+  getDefinitionById: vi.fn().mockResolvedValue(definition),
+  getBenchmarks: vi.fn().mockResolvedValue([benchmark]),
+  createSession: vi.fn().mockResolvedValue(undefined),
+  updateSession: vi.fn().mockResolvedValue(undefined),
+  getSessionById: vi.fn(),
+  listSessions: vi.fn().mockResolvedValue([]),
+  getResultsBySession: vi.fn().mockResolvedValue([]),
+  saveResults: vi.fn().mockResolvedValue(undefined),
+  completeSession: vi.fn().mockResolvedValue(undefined),
+  assignmentsForTeam: vi.fn().mockResolvedValue([]),
+  activePlayers: vi.fn().mockResolvedValue([]),
+})
 
 describe('testsService', () => {
   it('valide un benchmark compatible avec sa définition', () => {
@@ -121,11 +140,7 @@ describe('testsService', () => {
   })
 
   it('vérifie tests.read avant toute lecture repository', async () => {
-    const repository = {
-      getActiveDefinitions: vi.fn().mockResolvedValue([definition]),
-      getDefinitionById: vi.fn().mockResolvedValue(definition),
-      getBenchmarks: vi.fn().mockResolvedValue([benchmark]),
-    }
+    const repository = repositoryMock()
     const service = createTestsService(repository)
     await expect(
       service.getActiveDefinitions({
@@ -144,5 +159,155 @@ describe('testsService', () => {
       }),
     ).rejects.toBeInstanceOf(TestsDomainError)
     expect(repository.getActiveDefinitions).toHaveBeenCalledTimes(1)
+  })
+
+  it('valide les métriques, la précision, les bornes et conserve zéro', () => {
+    expect(validateTestValues({ TIME: 0 }, definition, true)).toEqual({
+      TIME: 0,
+    })
+    expect(() =>
+      validateTestValues({ UNKNOWN: 1 }, definition, false),
+    ).toThrowError(expect.objectContaining({ code: 'METRIC_NOT_FOUND' }))
+    expect(() =>
+      validateTestValues({ TIME: -1 }, definition, false),
+    ).toThrowError(
+      expect.objectContaining({ code: 'METRIC_VALUE_OUT_OF_RANGE' }),
+    )
+    expect(() =>
+      validateTestValues({ TIME: 3.456 }, definition, false),
+    ).toThrowError(
+      expect.objectContaining({ code: 'METRIC_PRECISION_INVALID' }),
+    )
+    expect(() =>
+      validateTestValues({ TIME: undefined }, definition, true),
+    ).toThrowError(expect.objectContaining({ code: 'REQUIRED_METRIC_MISSING' }))
+  })
+
+  it('calcule les joueuses éligibles à la date sportive de la session', async () => {
+    const repository = repositoryMock()
+    repository.assignmentsForTeam.mockResolvedValue([
+      {
+        assignmentId: 'before',
+        playerId: 'player-before',
+        teamId: 'team',
+        seasonId: 'season-2026',
+        assignmentType: 'TEMPORARY',
+        startDate: new Date('2026-09-01'),
+        status: 'ACTIVE',
+      },
+      {
+        assignmentId: 'current',
+        playerId: 'player-current',
+        teamId: 'team',
+        seasonId: 'season-2026',
+        assignmentType: 'PRIMARY',
+        startDate: new Date('2026-08-01'),
+        status: 'ACTIVE',
+      },
+    ])
+    repository.activePlayers.mockImplementation(async (ids: string[]) =>
+      ids.map((playerId) => ({ playerId })),
+    )
+    const service = createTestsService(repository)
+    await service.getEligiblePlayers(
+      { userId: 'user', activeRoleId: 'coach', teamId: 'team', accesses },
+      {
+        testSessionId: 'session',
+        testDefinitionId: definition.testDefinitionId,
+        testDefinitionVersion: 1,
+        teamId: 'team',
+        seasonId: 'season-2026',
+        categoryId: 'category',
+        date: new Date('2026-08-12'),
+        status: 'DRAFT',
+        createdBy: 'user',
+        createdAt: now,
+        updatedAt: now,
+      },
+    )
+    expect(repository.activePlayers).toHaveBeenCalledWith(['player-current'])
+  })
+
+  it('refuse une création de session hors Team ou avec une mauvaise version', async () => {
+    const service = createTestsService(repositoryMock())
+    const context = {
+      userId: 'user',
+      activeRoleId: 'coach',
+      teamId: 'team',
+      accesses,
+    }
+    const input = {
+      testSessionId: 'session',
+      testDefinitionId: definition.testDefinitionId,
+      testDefinitionVersion: 1,
+      teamId: 'team',
+      seasonId: 'season-2026',
+      categoryId: 'category',
+      date: now,
+    }
+    await expect(
+      service.createSession(context, { ...input, teamId: 'other' }),
+    ).rejects.toMatchObject({ code: 'TEST_CONTEXT_MISMATCH' })
+    await expect(
+      service.createSession(context, { ...input, testDefinitionVersion: 2 }),
+    ).rejects.toMatchObject({ code: 'TEST_DEFINITION_VERSION_MISMATCH' })
+  })
+
+  it('sauvegarde zéro sous un ID déterministe et refuse une joueuse hors scope', async () => {
+    const repository = repositoryMock()
+    const service = createTestsService(repository)
+    const session = {
+      testSessionId: 'session',
+      testDefinitionId: definition.testDefinitionId,
+      testDefinitionVersion: 1,
+      teamId: 'team',
+      seasonId: 'season-2026',
+      categoryId: 'category',
+      date: now,
+      status: 'DRAFT' as const,
+      createdBy: 'user',
+      createdAt: now,
+      updatedAt: now,
+    }
+    const player = {
+      playerId: 'player',
+      firstName: 'Ada',
+      lastName: 'Test',
+      birthDate: now,
+      playerProfile: 'FORWARD' as const,
+      preferredFoot: 'RIGHT' as const,
+      status: 'ACTIVE' as const,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const context = {
+      userId: 'user',
+      activeRoleId: 'coach',
+      teamId: 'team',
+      accesses,
+    }
+    await service.saveResults(
+      context,
+      session,
+      definition,
+      [player],
+      [{ playerId: 'player', values: { TIME: 0 } }],
+    )
+    expect(repository.saveResults).toHaveBeenCalledWith([
+      expect.objectContaining({
+        testResultId: 'session_player',
+        values: { TIME: 0 },
+        playerId: 'player',
+      }),
+    ])
+    await expect(
+      service.saveResults(
+        context,
+        session,
+        definition,
+        [player],
+        [{ playerId: 'other', values: { TIME: 3.2 } }],
+      ),
+    ).rejects.toMatchObject({ code: 'PLAYER_NOT_ELIGIBLE' })
   })
 })

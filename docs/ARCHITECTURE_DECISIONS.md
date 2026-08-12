@@ -1655,3 +1655,18 @@ vérité permanente dans Player.
   ajoutent sous-catégorie et définition lorsqu'elles influencent le résultat.
 - PR06 est read-only côté UI. La saisie TestSession/TestResult est réservée à
   PR07 et les comparaisons/normalisations avancées à PR08.
+
+## Addendum PR07 — sessions et saisie de résultats
+
+- `TestSession` fige définition/version, Team, Season, Category et date.
+- Le cycle minimal est `DRAFT → COMPLETED`; `tests.write` ne corrige pas une
+  session terminée. Une permission de correction dédiée sera introduite avec
+  son besoin métier.
+- `TestResult` utilise l'ID déterministe `{testSessionId}_{playerId}` et des
+  `values` dérivées exclusivement des métriques du protocole.
+- Zéro est une valeur ; l'absence de TestResult représente une joueuse non
+  testée.
+- L'éligibilité utilise les affectations effectives à `TestSession.date`.
+- La saisie reste locale jusqu'à une sauvegarde explicite. Les résultats sont
+  écrits en batch et la finalisation ajoute atomiquement le changement de
+  statut de la session.

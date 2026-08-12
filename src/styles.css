@@ -126,6 +126,8 @@ input {
 }
 .test-card {
   padding: 1.2rem;
+  display: grid;
+  gap: 0.8rem;
 }
 .test-card-heading {
   display: flex;
@@ -160,6 +162,41 @@ input {
 .empty-state {
   padding: 1.2rem;
 }
+.session-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.session-date {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 20rem;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  font-weight: 700;
+}
+.entry-table-wrap {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+.entry-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+.entry-table th,
+.entry-table td {
+  padding: 0.8rem;
+  border-bottom: 1px solid #e5efeb;
+  text-align: left;
+}
+.entry-table input {
+  min-width: 7rem;
+}
+.entry-actions {
+  display: flex;
+  gap: 0.8rem;
+}
 .login,
 .center {
   min-height: 100vh;
@@ -190,6 +227,9 @@ input {
     grid-template-columns: 1fr;
   }
   .test-grid {
+    grid-template-columns: 1fr;
+  }
+  .session-list {
     grid-template-columns: 1fr;
   }
 }

@@ -607,13 +607,13 @@ correspondre à la saison active.
 TestSession {
   testSessionId
   testDefinitionId
+  testDefinitionVersion
+  teamId
   seasonId
   categoryId
   date
-  title?
-  notes?
   status
-  createdByUserId
+  createdBy
   createdAt
   updatedAt
 }
@@ -623,14 +623,17 @@ TestSession {
 
 Si deux catégories réalisent le même test le même jour, deux TestSession sont créées.
 
-Statuts :
+Statuts PR07 :
 
 ```text
-PLANNED
-IN_PROGRESS
+DRAFT
 COMPLETED
-CANCELLED
 ```
+
+La Team, la Season et la Category sont figées à la création. `DRAFT` autorise
+la saisie et la correction ; `COMPLETED` est verrouillé. Une correction future
+d'une session terminée nécessitera une permission dédiée. Aucun champ vide de
+présentation (`title`, `location`, `notes`) n'est ajouté sans besoin métier.
 
 ---
 
@@ -640,10 +643,14 @@ CANCELLED
 TestResult {
   testResultId
   testSessionId
+  testDefinitionId
+  testDefinitionVersion
   playerId
+  teamId
+  seasonId
   values
-  note?
-  recordedByUserId
+  contextSnapshot.preferredFoot
+  createdBy
   createdAt
   updatedAt
 }
@@ -661,11 +668,16 @@ Exemple :
 
 ```ts
 values: {
-  strongFoot: 42,
-  weakFoot: 31,
-  alternating: 55
+  STRONG_FOOT: 42,
+  WEAK_FOOT: 31,
+  ALTERNATING: 55
 }
 ```
+
+Une valeur `0` est persistée et affichée comme un résultat réel. Une joueuse
+non testée n'a pas de TestResult ; aucun document vide ni zéro artificiel n'est
+créé. Le snapshot minimal de pied conserve l'interprétation historique des
+métriques relatives sans recopier le protocole.
 
 Meilleures performances, moyennes, médianes, progressions et classements sont dérivés.
 

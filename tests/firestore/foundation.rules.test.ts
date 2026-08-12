@@ -11,6 +11,7 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -47,11 +48,12 @@ beforeEach(async () => {
     await Promise.all([
       write('roles/coach', { isActive: true }),
       write('roles/analyst', { isActive: true }),
+      write('roles/reader', { isActive: true }),
       write('roles/admin', { isActive: true }),
       write('roles/inactive-role', { isActive: false }),
       write('users/user-a', {
         status: 'ACTIVE',
-        roleIds: ['coach', 'analyst', 'inactive-role'],
+        roleIds: ['coach', 'analyst', 'reader', 'inactive-role'],
         securityContext: securityContext('coach'),
       }),
       write('users/user-disabled', {
@@ -80,10 +82,11 @@ beforeEach(async () => {
         status: 'ACTIVE',
         rolePermissions: {
           coach: {
-            permissions: ['players.read', 'tests.read'],
+            permissions: ['players.read', 'tests.read', 'tests.write'],
             medicalAccessLevel: 'NONE',
           },
           analyst: { permissions: [], medicalAccessLevel: 'NONE' },
+          reader: { permissions: ['tests.read'], medicalAccessLevel: 'NONE' },
           'inactive-role': {
             permissions: ['players.read'],
             medicalAccessLevel: 'NONE',
@@ -162,6 +165,31 @@ beforeEach(async () => {
         status: 'ACTIVE',
         version: 1,
       }),
+      write('testSessions/session-existing', {
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        teamId: 'team-a',
+        seasonId,
+        categoryId: 'category-a',
+        date: new Date('2026-08-12T00:00:00.000Z'),
+        status: 'DRAFT',
+        createdBy: 'user-a',
+        createdAt: new Date('2026-08-12T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T00:00:00.000Z'),
+      }),
+      write('testResults/session-existing_player-a', {
+        testSessionId: 'session-existing',
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        playerId: 'player-a',
+        teamId: 'team-a',
+        seasonId,
+        values: { STRONG_FOOT: 0 },
+        contextSnapshot: { preferredFoot: 'RIGHT' },
+        createdBy: 'user-a',
+        createdAt: new Date('2026-08-12T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T00:00:00.000Z'),
+      }),
       write('testBenchmarks/benchmark-a', {
         testDefinitionId: 'juggling-v1',
         testDefinitionVersion: 1,
@@ -185,6 +213,7 @@ beforeEach(async () => {
       }),
       write('players/player-a', { status: 'ACTIVE' }),
       write('players/player-b', { status: 'ACTIVE' }),
+      write('players/player-c', { status: 'ACTIVE' }),
       write('playerTeamAssignments/assignment-a', {
         playerId: 'player-a',
         teamId: 'team-a',
@@ -208,6 +237,14 @@ beforeEach(async () => {
       write(`playerAccessScopes/player-b_team-b_${seasonId}`, {
         playerId: 'player-b',
         teamId: 'team-b',
+        seasonId,
+        status: 'ACTIVE',
+        startDate: new Date('2026-08-01T00:00:00.000Z'),
+        source: 'PLAYER_TEAM_ASSIGNMENT',
+      }),
+      write(`playerAccessScopes/player-c_team-a_${seasonId}`, {
+        playerId: 'player-c',
+        teamId: 'team-a',
         seasonId,
         status: 'ACTIVE',
         startDate: new Date('2026-08-01T00:00:00.000Z'),
@@ -287,6 +324,151 @@ describe('Security Rules du domaine Tests PR06', () => {
     await assertFails(
       setDoc(doc(db, 'testBenchmarks/new-benchmark'), {
         status: 'ACTIVE',
+      }),
+    )
+  })
+})
+
+describe('Security Rules TestSession/TestResult PR07', () => {
+  const sessionData = (overrides: Record<string, unknown> = {}) => ({
+    testDefinitionId: 'juggling-v1',
+    testDefinitionVersion: 1,
+    teamId: 'team-a',
+    seasonId,
+    categoryId: 'category-a',
+    date: new Date('2026-08-12T00:00:00.000Z'),
+    status: 'DRAFT',
+    createdBy: 'user-a',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  })
+
+  it('refuse les lectures non authentifiées, désactivées et sans tests.read', async () => {
+    await assertFails(
+      getDoc(
+        doc(
+          testEnv.unauthenticatedContext().firestore(),
+          'testSessions/session-existing',
+        ),
+      ),
+    )
+    await assertFails(
+      getDoc(
+        doc(
+          testEnv.authenticatedContext('user-disabled').firestore(),
+          'testSessions/session-existing',
+        ),
+      ),
+    )
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('analyst'),
+      }),
+    )
+    await assertFails(getDoc(doc(db, 'testSessions/session-existing')))
+  })
+
+  it('distingue tests.read de tests.write', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('reader'),
+      }),
+    )
+    await assertSucceeds(getDoc(doc(db, 'testSessions/session-existing')))
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testSessions'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testResults'),
+          where('testSessionId', '==', 'session-existing'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
+    await assertFails(
+      setDoc(doc(db, 'testSessions/reader-session'), sessionData()),
+    )
+  })
+
+  it('autorise une session du contexte actif et refuse Team, saison ou version incohérente', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(setDoc(doc(db, 'testSessions/valid'), sessionData()))
+    await assertFails(
+      setDoc(
+        doc(db, 'testSessions/wrong-team'),
+        sessionData({ teamId: 'team-b', categoryId: 'category-b' }),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(db, 'testSessions/wrong-season'),
+        sessionData({ seasonId: 'other-season' }),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(db, 'testSessions/wrong-version'),
+        sessionData({ testDefinitionVersion: 2 }),
+      ),
+    )
+  })
+
+  it('autorise un résultat canonique, y compris zéro, et refuse player hors scope', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const result = (playerId: string) => ({
+      testSessionId: 'session-existing',
+      testDefinitionId: 'juggling-v1',
+      testDefinitionVersion: 1,
+      playerId,
+      teamId: 'team-a',
+      seasonId,
+      values: { STRONG_FOOT: 0 },
+      contextSnapshot: { preferredFoot: 'RIGHT' },
+      createdBy: 'user-a',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'testResults/session-existing_player-c'),
+        result('player-c'),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(db, 'testResults/session-existing_player-b'),
+        result('player-b'),
+      ),
+    )
+    await assertFails(
+      setDoc(doc(db, 'testResults/duplicate-id'), result('player-a')),
+    )
+  })
+
+  it('finalise une session DRAFT et interdit ensuite les corrections ordinaires', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'testSessions/session-existing'), {
+        status: 'COMPLETED',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(db, 'testResults/session-existing_player-a'), {
+        values: { STRONG_FOOT: 12 },
+        updatedAt: serverTimestamp(),
       }),
     )
   })

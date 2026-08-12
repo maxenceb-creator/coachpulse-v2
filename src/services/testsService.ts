@@ -1,14 +1,19 @@
 import type {
   TeamAccess,
+  Player,
   TestBenchmark,
   TestDefinition,
   TestMetricDefinition,
+  TestResult,
+  TestSession,
 } from '../types/domain'
 import type {
   TestBenchmarksQuery,
   TestsRepository,
 } from '../repositories/testsRepository'
 import { hasPermission } from './permissionsService'
+import { isAssignmentEffective } from './assignmentsService'
+import type { Assignment } from '../types/domain'
 
 export type TestsSecurityContext = {
   userId: string
@@ -25,10 +30,74 @@ export class TestsDomainError extends Error {
       | 'BENCHMARK_METRIC_NOT_FOUND'
       | 'BENCHMARK_VERSION_MISMATCH'
       | 'BENCHMARK_SUBCATEGORY_MISMATCH'
-      | 'BENCHMARK_VALUE_OUT_OF_RANGE',
+      | 'BENCHMARK_VALUE_OUT_OF_RANGE'
+      | 'TEST_SESSION_NOT_FOUND'
+      | 'TEST_SESSION_NOT_EDITABLE'
+      | 'TEST_DEFINITION_VERSION_MISMATCH'
+      | 'TEST_CONTEXT_MISMATCH'
+      | 'PLAYER_NOT_ELIGIBLE'
+      | 'METRIC_NOT_FOUND'
+      | 'METRIC_VALUE_OUT_OF_RANGE'
+      | 'METRIC_PRECISION_INVALID'
+      | 'REQUIRED_METRIC_MISSING',
   ) {
     super(code)
   }
+}
+
+const requireTestsWrite = (context: TestsSecurityContext) => {
+  if (
+    !hasPermission(context.accesses, {
+      userId: context.userId,
+      activeRoleId: context.activeRoleId,
+      teamId: context.teamId,
+      permissionKey: 'tests.write',
+    })
+  ) {
+    throw new TestsDomainError('PERMISSION_DENIED')
+  }
+}
+
+export const validateTestValues = (
+  values: Record<string, number | undefined>,
+  definition: TestDefinition,
+  requireComplete: boolean,
+) => {
+  const metrics = new Map(
+    definition.metrics.map((metric) => [metric.metricKey, metric]),
+  )
+  for (const [metricKey, value] of Object.entries(values)) {
+    const metric = metrics.get(metricKey)
+    if (!metric) throw new TestsDomainError('METRIC_NOT_FOUND')
+    if (value === undefined) continue
+    if (!Number.isFinite(value))
+      throw new TestsDomainError('METRIC_VALUE_OUT_OF_RANGE')
+    if (
+      (metric.minValue !== undefined && value < metric.minValue) ||
+      (metric.maxValue !== undefined && value > metric.maxValue)
+    )
+      throw new TestsDomainError('METRIC_VALUE_OUT_OF_RANGE')
+    const decimals = (String(value).split('.')[1] ?? '').length
+    if (metric.precision !== undefined && decimals > metric.precision)
+      throw new TestsDomainError('METRIC_PRECISION_INVALID')
+  }
+  if (
+    requireComplete &&
+    definition.metrics.some(
+      (metric) => metric.required && values[metric.metricKey] === undefined,
+    )
+  )
+    throw new TestsDomainError('REQUIRED_METRIC_MISSING')
+  return Object.fromEntries(
+    Object.entries(values).filter(
+      (entry): entry is [string, number] => entry[1] !== undefined,
+    ),
+  )
+}
+
+type TestsServiceRepository = TestsRepository & {
+  assignmentsForTeam(teamId: string, seasonId: string): Promise<Assignment[]>
+  activePlayers(playerIds: string[]): Promise<Player[]>
 }
 
 const requireTestsRead = (context: TestsSecurityContext) => {
@@ -96,7 +165,7 @@ export const areTestMetricsComparable = (
   left.metric.unit === right.metric.unit &&
   left.metric.direction === right.metric.direction
 
-export const createTestsService = (repository: TestsRepository) => ({
+export const createTestsService = (repository: TestsServiceRepository) => ({
   async getActiveDefinitions(context: TestsSecurityContext) {
     requireTestsRead(context)
     return repository.getActiveDefinitions()
@@ -137,5 +206,139 @@ export const createTestsService = (repository: TestsRepository) => ({
       )
     }
     return benchmarks
+  },
+  async listSessions(context: TestsSecurityContext, seasonId: string) {
+    requireTestsRead(context)
+    return repository.listSessions(context.teamId, seasonId)
+  },
+  async getSession(context: TestsSecurityContext, testSessionId: string) {
+    requireTestsRead(context)
+    const session = await repository.getSessionById(testSessionId)
+    if (!session) throw new TestsDomainError('TEST_SESSION_NOT_FOUND')
+    if (session.teamId !== context.teamId)
+      throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
+    return session
+  },
+  async createSession(
+    context: TestsSecurityContext,
+    input: {
+      testSessionId: string
+      testDefinitionId: string
+      testDefinitionVersion: number
+      teamId: string
+      seasonId: string
+      categoryId: string
+      date: Date
+    },
+  ) {
+    requireTestsWrite(context)
+    if (input.teamId !== context.teamId)
+      throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
+    const definition = await repository.getDefinitionById(
+      input.testDefinitionId,
+    )
+    if (!definition) throw new TestsDomainError('TEST_DEFINITION_NOT_FOUND')
+    if (definition.version !== input.testDefinitionVersion)
+      throw new TestsDomainError('TEST_DEFINITION_VERSION_MISMATCH')
+    const now = new Date()
+    const session: TestSession = {
+      ...input,
+      status: 'DRAFT',
+      createdBy: context.userId,
+      createdAt: now,
+      updatedAt: now,
+    }
+    await repository.createSession(session)
+    return session
+  },
+  async getEligiblePlayers(
+    context: TestsSecurityContext,
+    session: TestSession,
+  ) {
+    requireTestsRead(context)
+    if (session.teamId !== context.teamId)
+      throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
+    const assignments = await repository.assignmentsForTeam(
+      session.teamId,
+      session.seasonId,
+    )
+    const ids = [
+      ...new Set(
+        assignments
+          .filter((assignment) =>
+            isAssignmentEffective(assignment, session.date),
+          )
+          .map((assignment) => assignment.playerId),
+      ),
+    ]
+    return repository.activePlayers(ids)
+  },
+  async getResults(context: TestsSecurityContext, session: TestSession) {
+    requireTestsRead(context)
+    if (session.teamId !== context.teamId)
+      throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
+    return repository.getResultsBySession(
+      session.testSessionId,
+      session.teamId,
+      session.seasonId,
+    )
+  },
+  async saveResults(
+    context: TestsSecurityContext,
+    session: TestSession,
+    definition: TestDefinition,
+    players: Player[],
+    drafts: { playerId: string; values: Record<string, number | undefined> }[],
+    complete = false,
+  ) {
+    requireTestsWrite(context)
+    if (session.status !== 'DRAFT')
+      throw new TestsDomainError('TEST_SESSION_NOT_EDITABLE')
+    if (
+      session.teamId !== context.teamId ||
+      definition.testDefinitionId !== session.testDefinitionId ||
+      definition.version !== session.testDefinitionVersion
+    )
+      throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
+    const allowed = new Map(players.map((player) => [player.playerId, player]))
+    const existing = new Map(
+      (
+        await repository.getResultsBySession(
+          session.testSessionId,
+          session.teamId,
+          session.seasonId,
+        )
+      ).map((result) => [result.playerId, result]),
+    )
+    const now = new Date()
+    const results: TestResult[] = drafts
+      .filter(({ values }) =>
+        Object.values(values).some((value) => value !== undefined),
+      )
+      .map(({ playerId, values }) => {
+        const player = allowed.get(playerId)
+        if (!player) throw new TestsDomainError('PLAYER_NOT_ELIGIBLE')
+        const previous = existing.get(playerId)
+        return {
+          testResultId: `${session.testSessionId}_${playerId}`,
+          testSessionId: session.testSessionId,
+          testDefinitionId: session.testDefinitionId,
+          testDefinitionVersion: session.testDefinitionVersion,
+          playerId,
+          teamId: session.teamId,
+          seasonId: session.seasonId,
+          values: validateTestValues(values, definition, complete),
+          contextSnapshot: { preferredFoot: player.preferredFoot },
+          createdBy: previous?.createdBy ?? context.userId,
+          createdAt: previous?.createdAt ?? now,
+          updatedAt: now,
+        }
+      })
+    if (complete) {
+      await repository.completeSession({ ...session, updatedAt: now }, results)
+    } else if (results.length) {
+      await repository.saveResults(results)
+    }
+    return results
   },
 })
