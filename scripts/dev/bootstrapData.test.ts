@@ -78,6 +78,16 @@ describe('DEV bootstrap data', () => {
     ).toBe(true)
   })
 
+  it('autorise Coach principal sur U13F et U14F', () => {
+    const coachTeamIds = dataset.userTeamAccess
+      .filter(({ rolePermissions }) =>
+        Boolean(rolePermissions['role-coach-principal']),
+      )
+      .map(({ teamId }) => teamId)
+
+    expect(coachTeamIds).toEqual(['team-dev-u13f', 'team-dev-u14f'])
+  })
+
   it('utilise les IDs propres à chaque collection pour les upserts', () => {
     const paths = seedEntries(dataset).map(
       ({ collection, id }) => `${collection}/${id}`,

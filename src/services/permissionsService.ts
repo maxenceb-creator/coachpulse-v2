@@ -33,3 +33,20 @@ export const canAccessTeam = (
       isAccessActive(a) &&
       Boolean(a.rolePermissions[role]),
   )
+
+export const resolveAccessibleTeamAccesses = (
+  all: TeamAccess[],
+  uid: string,
+  activeRoleId: string,
+  now = new Date(),
+) => {
+  const userAccesses = all.filter((access) => access.userId === uid)
+  const activeAccesses = userAccesses.filter((access) =>
+    isAccessActive(access, now),
+  )
+  const roleAccesses = activeAccesses.filter((access) =>
+    Boolean(access.rolePermissions[activeRoleId]),
+  )
+
+  return { userAccesses, activeAccesses, roleAccesses }
+}

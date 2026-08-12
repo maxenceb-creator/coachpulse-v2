@@ -551,6 +551,7 @@ export function buildBootstrapDataset(
       }),
       access(U14, {
         [ADMIN]: rolePermission(adminPermissions),
+        [COACH]: rolePermission(coachPermissions),
         [ANALYST]: rolePermission(analystPermissions),
       }),
       access(FIRST_TEAM, { [ADMIN]: rolePermission(adminPermissions) }),
