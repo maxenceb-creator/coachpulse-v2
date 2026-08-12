@@ -2,56 +2,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useApp } from '../app/AppContext'
 import { useAuth } from '../auth/AuthProvider'
 import { useTestDefinitions } from '../hooks/useTestDefinitions'
-import type { TestDefinition } from '../types/domain'
 import { useState } from 'react'
 import {
   useCreateTestSession,
   useTestSessions,
   type TestHookContext,
 } from '../hooks/useTestSession'
-
-const unitLabels: Record<TestDefinition['metrics'][number]['unit'], string> = {
-  COUNT: 'répétitions',
-  SECOND: 'secondes',
-  METER: 'mètres',
-  CENTIMETER: 'centimètres',
-  KM_H: 'km/h',
-}
-
-function DefinitionCard({
-  definition,
-  onCreate,
-  creating,
-}: {
-  definition: TestDefinition
-  onCreate: () => void
-  creating: boolean
-}) {
-  return (
-    <article className="card test-card">
-      <div className="test-card-heading">
-        <div>
-          <p className="eyebrow">{definition.code}</p>
-          <h3>{definition.name}</h3>
-        </div>
-        <span className="status">v{definition.version}</span>
-      </div>
-      {definition.description ? <p>{definition.description}</p> : null}
-      <ul className="metric-list">
-        {definition.metrics.map((metric) => (
-          <li key={metric.metricKey}>
-            <span>{metric.label}</span>
-            <strong>{unitLabels[metric.unit]}</strong>
-          </li>
-        ))}
-      </ul>
-      <small>Statut : {definition.status}</small>
-      <button disabled={creating} onClick={onCreate} type="button">
-        Nouvelle session
-      </button>
-    </article>
-  )
-}
+import { TestDefinitionCard } from '../components/TestDefinitionCard'
+import { hasPermission } from '../services/permissionsService'
 
 export function TestsPage() {
   const { user } = useAuth()
@@ -70,6 +28,26 @@ export function TestsPage() {
   }
   const sessions = useTestSessions(hookContext)
   const createSession = useCreateTestSession(hookContext)
+  const activeTeam = context.teams.find(
+    ({ teamId }) => teamId === context.activeTeamId,
+  )
+  const canWriteTests = hasPermission(context.accesses, {
+    userId: user?.uid ?? '',
+    activeRoleId: context.activeRoleId ?? '',
+    teamId: context.activeTeamId ?? '',
+    permissionKey: 'tests.write',
+  })
+  const creationDisabledReason = !context.securityContextReady
+    ? 'Contexte de sécurité non prêt'
+    : !canWriteTests
+      ? 'Permission tests.write absente'
+      : !activeTeam?.categoryId
+        ? 'Category de la Team active absente'
+        : !sessionDate
+          ? 'Date de session absente'
+          : createSession.isPending
+            ? 'Création en cours'
+            : undefined
   const definitions = useTestDefinitions({
     uid: user?.uid,
     roleId: context.activeRoleId,
@@ -142,6 +120,9 @@ export function TestsPage() {
             <p className="card empty-state">Aucune session dans ce contexte.</p>
           )}
         </section>
+        {createSession.isError ? (
+          <p className="error">Impossible de créer la session de test.</p>
+        ) : null}
         {groups.map(({ domain, title }) => {
           const items = (definitions.data ?? []).filter(
             (definition) => definition.domain === domain,
@@ -152,20 +133,33 @@ export function TestsPage() {
               {items.length ? (
                 <div className="test-grid">
                   {items.map((definition) => (
-                    <DefinitionCard
+                    <TestDefinitionCard
+                      canWriteTests={canWriteTests}
                       definition={definition}
+                      disabledReason={creationDisabledReason}
                       key={definition.testDefinitionId}
-                      creating={createSession.isPending}
+                      isPending={createSession.isPending}
+                      securityContextReady={context.securityContextReady}
                       onCreate={() => {
-                        const team = context.teams.find(
-                          ({ teamId }) => teamId === context.activeTeamId,
-                        )
-                        if (!team?.categoryId) return
+                        if (import.meta.env.DEV) {
+                          console.debug(
+                            '[TestSession DEV] Nouvelle session demandée',
+                            {
+                              definitionId: definition.testDefinitionId,
+                              roleId: hookContext.roleId,
+                              teamId: hookContext.teamId,
+                              seasonId: hookContext.seasonId,
+                              date: sessionDate,
+                            },
+                          )
+                        }
+                        if (!activeTeam?.categoryId || creationDisabledReason)
+                          return
                         createSession.mutate(
                           {
                             testDefinitionId: definition.testDefinitionId,
                             testDefinitionVersion: definition.version,
-                            categoryId: team.categoryId,
+                            categoryId: activeTeam.categoryId,
                             date: new Date(`${sessionDate}T12:00:00`),
                           },
                           {

@@ -19,6 +19,10 @@ import {
   setMany,
   update,
 } from './firestoreRepository'
+import {
+  toTestResultDocument,
+  toTestSessionDocument,
+} from './testDocumentMappers'
 
 export type TestBenchmarksQuery = {
   subCategoryId: string
@@ -61,12 +65,15 @@ export const testsRepository: TestsRepository = {
         : []),
       limit(100),
     ]),
-  createSession: (session) =>
-    set('testSessions', session.testSessionId, {
+  createSession: (value) => {
+    const { testSessionId } = value
+    const session = toTestSessionDocument(value)
+    return set('testSessions', testSessionId, {
       ...session,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }),
+    })
+  },
   updateSession: (id, data) => update('testSessions', id, data),
   getSessionById: (id) => one('testSessions', id, testSessionSchema),
   listSessions: (teamId, seasonId) =>
@@ -85,22 +92,22 @@ export const testsRepository: TestsRepository = {
     ]),
   saveResults: (results) =>
     setMany(
-      results.map((result) => ({
+      results.map((value) => ({
         path: 'testResults',
-        id: result.testResultId,
+        id: value.testResultId,
         data: {
-          ...result,
+          ...toTestResultDocument(value),
           updatedAt: serverTimestamp(),
         },
       })),
     ),
   completeSession: (session, results) =>
     commitWrites(
-      results.map((result) => ({
+      results.map((value) => ({
         path: 'testResults',
-        id: result.testResultId,
+        id: value.testResultId,
         data: {
-          ...result,
+          ...toTestResultDocument(value),
           updatedAt: serverTimestamp(),
         },
       })),
