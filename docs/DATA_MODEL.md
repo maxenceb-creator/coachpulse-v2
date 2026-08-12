@@ -435,10 +435,13 @@ Il ne doit pas exister deux architectures indépendantes pour les tests techniqu
 TestDefinition {
   testDefinitionId
   name
+  code
   description?
   domain
   status
+  version
   metrics[]
+  attemptPolicy?
   createdAt
   updatedAt
 }
@@ -459,7 +462,9 @@ INACTIVE
 ARCHIVED
 ```
 
-Un protocole fortement modifié doit créer une nouvelle TestDefinition plutôt que réécrire l'historique.
+Un protocole fortement modifié incrémente `version` et possède un identifiant de
+définition/version stable. Il ne réécrit jamais la version utilisée par
+l'historique.
 
 ---
 
@@ -470,8 +475,9 @@ MetricDefinition {
   metricKey
   label
   valueType
-  unit?
-  performanceDirection
+  unit
+  direction
+  precision?
   minValue?
   maxValue?
   required
@@ -486,18 +492,14 @@ LOWER_IS_BETTER
 NEUTRAL
 ```
 
-Types :
+Type initial PR06 :
 
 ```text
 NUMBER
-TIME
-DISTANCE
-SCORE
-BOOLEAN
-TEXT
 ```
 
-Les unités doivent être normalisées.
+Les unités initiales sont normalisées : `COUNT`, `SECOND`, `METER`,
+`CENTIMETER`, `KM_H`.
 
 ---
 
@@ -552,6 +554,7 @@ TestBenchmark {
   testBenchmarkId
 
   testDefinitionId
+  testDefinitionVersion
   metricKey
   subCategoryId
 
@@ -591,6 +594,10 @@ CoachPulse doit permettre :
 - comparaison de plusieurs joueuses sur une même saison.
 
 Les comparaisons nécessitent des protocoles/versions, métriques et unités compatibles.
+
+Un benchmark saisonnier est sécurisé dans le contexte Team actif : sa
+`subCategoryId` doit appartenir à la Category de la Team et son `seasonId` doit
+correspondre à la saison active.
 
 ---
 

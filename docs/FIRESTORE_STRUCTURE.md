@@ -139,12 +139,22 @@ Pour une joueuse : `users/{uid}.linkedPlayerId == resource.playerId`. Pour crée
 TrainingLoad n'a pas de collection source : il est dérivé de Session + Attendance + RPE.
 
 ## testDefinitions
-`testDefinitions/{testDefinitionId}` contient le protocole versionné et ses measurements[].
+`testDefinitions/{testDefinitionId}` contient `code`, `version`, le protocole
+et ses `metrics[]` structurées. Une métrique PR06 contient `metricKey`, `label`,
+`valueType = NUMBER`, une unité normalisée, `direction`, `required` et ses
+bornes/précision éventuelles.
 
 ## testBenchmarks
-`testBenchmarks/{testBenchmarkId}` contient `testDefinitionId`, `metricKey`, `subCategoryId`, niveau de référence, cible, contexte temporel éventuel et statut.
+`testBenchmarks/{testBenchmarkId}` contient `testDefinitionId`,
+`testDefinitionVersion`, `metricKey`, `subCategoryId`, niveau de référence,
+cible, `seasonId` pour les benchmarks saisonniers et statut.
 
 Les benchmarks sont des références, jamais une copie de TestResult.
+
+PR06 autorise leur lecture uniquement avec `tests.read` dans le contexte de
+sécurité actif. Pour un benchmark, la Team active doit être DEVELOPMENT, sa
+Category doit contenir `subCategoryId` et la saison doit correspondre. Les
+écritures client restent refusées ; les seeds DEV utilisent Firebase Admin.
 
 ## testSessions
 `testSessions/{testSessionId}` contient testDefinitionId, seasonId, categoryId, date et status.

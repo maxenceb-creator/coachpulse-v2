@@ -1,6 +1,8 @@
 # Données de bootstrap DEV
 
-Ce seed crée uniquement des données fictives marquées DEV/DEMO pour valider le socle Auth → User → rôles → permissions → Team → Season → Player → Dashboard. Il ne crée aucune donnée médicale ni aucun module métier supplémentaire.
+Ce seed crée uniquement des données fictives marquées DEV/DEMO pour valider le
+socle Auth → User → rôles → permissions → Team → Season → Player → Dashboard,
+puis la fondation du domaine Tests. Il ne crée aucune donnée médicale.
 
 ## Prérequis
 
@@ -41,9 +43,18 @@ Le seed vérifie que l'UID existe dans Firebase Authentication et que son email 
 
 ## Résultat attendu
 
-Le projet contient une saison active `2026-2027`, deux catégories/sous-catégories, deux Teams DEVELOPMENT, une FIRST_TEAM sans Season/Category forcée, cinq joueuses fictives, des affectations PRIMARY/SECONDARY/TEMPORARY, une joueuse sans affectation, trois rôles, un User multi-rôle et trois TeamAccess.
+Le projet contient une saison active `2026-2027`, deux
+catégories/sous-catégories, deux Teams DEVELOPMENT, une FIRST_TEAM sans
+Season/Category forcée, cinq joueuses fictives, des affectations
+PRIMARY/SECONDARY/TEMPORARY, une joueuse sans affectation, trois rôles, un User
+multi-rôle et trois TeamAccess. Il ajoute aussi trois TestDefinition
+versionnées (Jongles, Sprint 20 m, Cooper) et six TestBenchmark TARGET U13/U14.
 
-Après démarrage de l'application, le compte permet de tester le Dashboard, le changement de rôle, les Teams accessibles, la saison active et le nombre de joueuses par Team. Le rôle Coach principal possède un TeamAccess sur U13F et U14F ; l'équipe première reste réservée au rôle Admin dans ce dataset.
+Après démarrage de l'application, le compte permet de tester le Dashboard, le
+changement de rôle, les Teams accessibles, la saison active, le nombre de
+joueuses par Team et la page `/tests`. Le rôle Coach principal possède un
+TeamAccess sur U13F et U14F avec `tests.read` ; l'équipe première reste réservée
+au rôle Admin dans ce dataset.
 
 ## Relancer sans risque
 

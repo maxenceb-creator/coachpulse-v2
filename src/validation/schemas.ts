@@ -85,3 +85,74 @@ export const assignmentSchema = z.object({
   endDate: date.optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']),
 })
+
+const metricKeySchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/)
+
+export const testMetricDefinitionSchema = z
+  .object({
+    metricKey: metricKeySchema,
+    label: z.string().min(1),
+    valueType: z.literal('NUMBER'),
+    unit: z.enum(['COUNT', 'SECOND', 'METER', 'CENTIMETER', 'KM_H']),
+    direction: z.enum([
+      'HIGHER_IS_BETTER',
+      'LOWER_IS_BETTER',
+      'TARGET_IS_BETTER',
+      'NEUTRAL',
+    ]),
+    required: z.boolean(),
+    precision: z.number().int().min(0).max(6).optional(),
+    minValue: z.number().finite().optional(),
+    maxValue: z.number().finite().optional(),
+  })
+  .strict()
+  .refine(
+    ({ minValue, maxValue }) =>
+      minValue === undefined || maxValue === undefined || minValue <= maxValue,
+    { message: 'minValue doit être inférieur ou égal à maxValue' },
+  )
+
+export const testDefinitionSchema = z
+  .object({
+    testDefinitionId: z.string().min(1),
+    name: z.string().min(1),
+    code: metricKeySchema,
+    description: z.string().min(1).optional(),
+    domain: z.enum(['TECHNICAL', 'PHYSICAL']),
+    status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']),
+    version: z.number().int().positive(),
+    metrics: z.array(testMetricDefinitionSchema).min(1),
+    attemptPolicy: z
+      .object({
+        maxAttempts: z.number().int().positive().optional(),
+        aggregation: z.enum(['BEST', 'AVERAGE', 'LAST', 'MEDIAN']),
+      })
+      .strict()
+      .optional(),
+    createdAt: date,
+    updatedAt: date,
+  })
+  .strict()
+  .refine(
+    ({ metrics }) =>
+      new Set(metrics.map(({ metricKey }) => metricKey)).size ===
+      metrics.length,
+    { message: 'Les metricKey doivent être uniques', path: ['metrics'] },
+  )
+
+export const testBenchmarkSchema = z
+  .object({
+    testBenchmarkId: z.string().min(1),
+    testDefinitionId: z.string().min(1),
+    testDefinitionVersion: z.number().int().positive(),
+    metricKey: metricKeySchema,
+    subCategoryId: z.string().min(1),
+    seasonId: z.string().min(1).optional(),
+    benchmarkLevel: z.enum(['TARGET', 'GOOD', 'VERY_GOOD', 'REFERENCE']),
+    targetValue: z.number().finite(),
+    label: z.string().min(1).optional(),
+    status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']),
+    createdAt: date,
+    updatedAt: date,
+  })
+  .strict()

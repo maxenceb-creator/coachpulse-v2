@@ -111,6 +111,53 @@ const accessSchema = z.object({
   ...metadata,
 })
 
+const testMetricSchema = z.object({
+  metricKey: id,
+  label: z.string().min(1),
+  valueType: z.literal('NUMBER'),
+  unit: z.enum(['COUNT', 'SECOND', 'METER', 'CENTIMETER', 'KM_H']),
+  direction: z.enum([
+    'HIGHER_IS_BETTER',
+    'LOWER_IS_BETTER',
+    'TARGET_IS_BETTER',
+    'NEUTRAL',
+  ]),
+  required: z.boolean(),
+  precision: z.number().int().min(0).max(6).optional(),
+  minValue: z.number().optional(),
+  maxValue: z.number().optional(),
+})
+
+const testDefinitionSchema = z.object({
+  testDefinitionId: id,
+  name: z.string().min(1),
+  code: id,
+  description: z.string().min(1).optional(),
+  domain: z.enum(['TECHNICAL', 'PHYSICAL']),
+  status: z.literal('ACTIVE'),
+  version: z.number().int().positive(),
+  metrics: z.array(testMetricSchema).min(1),
+  attemptPolicy: z.object({
+    maxAttempts: z.number().int().positive().optional(),
+    aggregation: z.enum(['BEST', 'AVERAGE', 'LAST', 'MEDIAN']),
+  }),
+  ...metadata,
+})
+
+const testBenchmarkSchema = z.object({
+  testBenchmarkId: id,
+  testDefinitionId: id,
+  testDefinitionVersion: z.number().int().positive(),
+  metricKey: id,
+  subCategoryId: id,
+  seasonId: id,
+  benchmarkLevel: z.enum(['TARGET', 'GOOD', 'VERY_GOOD', 'REFERENCE']),
+  targetValue: z.number(),
+  label: z.string().min(1).optional(),
+  status: z.literal('ACTIVE'),
+  ...metadata,
+})
+
 const userSchema = z.object({
   userId: id,
   firstName: z.literal('Staff'),
@@ -136,6 +183,8 @@ const datasetSchema = z.object({
   players: z.array(playerSchema),
   playerTeamAssignments: z.array(assignmentSchema),
   playerAccessScopes: z.array(playerAccessScopeSchema),
+  testDefinitions: z.array(testDefinitionSchema),
+  testBenchmarks: z.array(testBenchmarkSchema),
   users: z.array(userSchema).length(1),
   userTeamAccess: z.array(accessSchema),
 })
@@ -165,6 +214,8 @@ const adminPermissions = [
   'players.read',
   'players.write',
   'players.manageAssignments',
+  'tests.read',
+  'testDefinitions.manage',
 ]
 const coachPermissions = [
   'players.read',
@@ -262,6 +313,36 @@ function validateBusinessInvariants(dataset: BootstrapDataset) {
       if (!user.roleIds.includes(roleId) || !roleIds.has(roleId)) {
         throw new Error(`Rôle inconnu dans ${access.userTeamAccessId}.`)
       }
+    }
+  }
+
+  const subCategoryIds = new Set(
+    dataset.subCategories.map(({ subCategoryId }) => subCategoryId),
+  )
+  const definitions = new Map(
+    dataset.testDefinitions.map((definition) => [
+      definition.testDefinitionId,
+      definition,
+    ]),
+  )
+  for (const benchmark of dataset.testBenchmarks) {
+    const definition = definitions.get(benchmark.testDefinitionId)
+    if (!definition || definition.version !== benchmark.testDefinitionVersion) {
+      throw new Error(
+        `Version de protocole invalide pour ${benchmark.testBenchmarkId}.`,
+      )
+    }
+    if (
+      !definition.metrics.some(
+        ({ metricKey }) => metricKey === benchmark.metricKey,
+      )
+    ) {
+      throw new Error(`Métrique inconnue pour ${benchmark.testBenchmarkId}.`)
+    }
+    if (!subCategoryIds.has(benchmark.subCategoryId)) {
+      throw new Error(
+        `Sous-catégorie inconnue pour ${benchmark.testBenchmarkId}.`,
+      )
     }
   }
 }
@@ -526,6 +607,143 @@ export function buildBootstrapDataset(
       source: 'PLAYER_TEAM_ASSIGNMENT' as const,
       ...meta,
     })),
+    testDefinitions: [
+      {
+        testDefinitionId: 'test-juggling-v1',
+        name: 'Jongles',
+        code: 'JUGGLING',
+        description:
+          'Protocole technique DEV pied fort, pied faible et alterné.',
+        domain: 'TECHNICAL',
+        status: 'ACTIVE',
+        version: 1,
+        metrics: [
+          ['STRONG_FOOT', 'Pied fort'],
+          ['WEAK_FOOT', 'Pied faible'],
+          ['ALTERNATING', 'Alternés'],
+        ].map(([metricKey, label]) => ({
+          metricKey,
+          label,
+          valueType: 'NUMBER' as const,
+          unit: 'COUNT' as const,
+          direction: 'HIGHER_IS_BETTER' as const,
+          required: true,
+          precision: 0,
+          minValue: 0,
+        })),
+        attemptPolicy: { maxAttempts: 3, aggregation: 'BEST' },
+        ...meta,
+      },
+      {
+        testDefinitionId: 'test-sprint-20m-v1',
+        name: 'Sprint 20 m',
+        code: 'SPRINT_20M',
+        description: 'Chronométrage DEV sur 20 mètres.',
+        domain: 'PHYSICAL',
+        status: 'ACTIVE',
+        version: 1,
+        metrics: [
+          {
+            metricKey: 'TIME',
+            label: 'Temps',
+            valueType: 'NUMBER',
+            unit: 'SECOND',
+            direction: 'LOWER_IS_BETTER',
+            required: true,
+            precision: 2,
+            minValue: 0,
+          },
+        ],
+        attemptPolicy: { maxAttempts: 2, aggregation: 'BEST' },
+        ...meta,
+      },
+      {
+        testDefinitionId: 'test-cooper-v1',
+        name: 'Cooper',
+        code: 'COOPER',
+        description: 'Distance DEV parcourue en 12 minutes.',
+        domain: 'PHYSICAL',
+        status: 'ACTIVE',
+        version: 1,
+        metrics: [
+          {
+            metricKey: 'DISTANCE',
+            label: 'Distance',
+            valueType: 'NUMBER',
+            unit: 'METER',
+            direction: 'HIGHER_IS_BETTER',
+            required: true,
+            precision: 0,
+            minValue: 0,
+          },
+        ],
+        attemptPolicy: { maxAttempts: 1, aggregation: 'LAST' },
+        ...meta,
+      },
+    ],
+    testBenchmarks: [
+      [
+        'benchmark-u13-juggling-strong-v1',
+        'test-juggling-v1',
+        'STRONG_FOOT',
+        'subcat-u13-2026',
+        50,
+      ],
+      [
+        'benchmark-u14-juggling-strong-v1',
+        'test-juggling-v1',
+        'STRONG_FOOT',
+        'subcat-u14-2026',
+        70,
+      ],
+      [
+        'benchmark-u13-sprint-20m-v1',
+        'test-sprint-20m-v1',
+        'TIME',
+        'subcat-u13-2026',
+        3.8,
+      ],
+      [
+        'benchmark-u14-sprint-20m-v1',
+        'test-sprint-20m-v1',
+        'TIME',
+        'subcat-u14-2026',
+        3.6,
+      ],
+      [
+        'benchmark-u13-cooper-v1',
+        'test-cooper-v1',
+        'DISTANCE',
+        'subcat-u13-2026',
+        2200,
+      ],
+      [
+        'benchmark-u14-cooper-v1',
+        'test-cooper-v1',
+        'DISTANCE',
+        'subcat-u14-2026',
+        2400,
+      ],
+    ].map(
+      ([
+        testBenchmarkId,
+        testDefinitionId,
+        metricKey,
+        subCategoryId,
+        targetValue,
+      ]) => ({
+        testBenchmarkId: String(testBenchmarkId),
+        testDefinitionId: String(testDefinitionId),
+        testDefinitionVersion: 1,
+        metricKey: String(metricKey),
+        subCategoryId: String(subCategoryId),
+        seasonId: SEASON,
+        benchmarkLevel: 'TARGET' as const,
+        targetValue: Number(targetValue),
+        status: 'ACTIVE' as const,
+        ...meta,
+      }),
+    ),
     users: [
       {
         userId: uid,
@@ -572,6 +790,8 @@ export function seedEntries(dataset: BootstrapDataset) {
     players: 'playerId',
     playerTeamAssignments: 'assignmentId',
     playerAccessScopes: 'playerAccessScopeId',
+    testDefinitions: 'testDefinitionId',
+    testBenchmarks: 'testBenchmarkId',
     users: 'userId',
     userTeamAccess: 'userTeamAccessId',
   } as const satisfies Record<SeedCollection, string>

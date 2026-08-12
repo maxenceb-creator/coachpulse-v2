@@ -88,6 +88,20 @@ describe('DEV bootstrap data', () => {
     expect(coachTeamIds).toEqual(['team-dev-u13f', 'team-dev-u14f'])
   })
 
+  it('crée les protocoles et benchmarks Tests DEV déterministes', () => {
+    expect(dataset.testDefinitions.map(({ code }) => code)).toEqual([
+      'JUGGLING',
+      'SPRINT_20M',
+      'COOPER',
+    ])
+    expect(dataset.testBenchmarks).toHaveLength(6)
+    expect(
+      dataset.testDefinitions
+        .find(({ code }) => code === 'JUGGLING')
+        ?.metrics.map(({ metricKey }) => metricKey),
+    ).toEqual(['STRONG_FOOT', 'WEAK_FOOT', 'ALTERNATING'])
+  })
+
   it('utilise les IDs propres à chaque collection pour les upserts', () => {
     const paths = seedEntries(dataset).map(
       ({ collection, id }) => `${collection}/${id}`,
@@ -96,6 +110,8 @@ describe('DEV bootstrap data', () => {
     expect(paths).toContain(
       'playerTeamAssignments/assignment-emma-secondary-u14',
     )
+    expect(paths).toContain('testDefinitions/test-juggling-v1')
+    expect(paths).toContain('testBenchmarks/benchmark-u14-cooper-v1')
     expect(new Set(paths).size).toBe(paths.length)
   })
 })

@@ -40,6 +40,8 @@ const ids: Record<string, string> = {
   seasons: 'seasonId',
   players: 'playerId',
   playerTeamAssignments: 'assignmentId',
+  testDefinitions: 'testDefinitionId',
+  testBenchmarks: 'testBenchmarkId',
 }
 export async function one<T>(path: string, id: string, s: ZodType<T>) {
   return withDevFirestoreLog(`getDoc ${path}/${id}`, async () => {
