@@ -15,6 +15,13 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/userTeamAccess/$(request.auth.uid + '_' + teamId));
     }
 
+    function activeAccess(teamId) {
+      return activeUser()
+        && access(teamId).data.status == 'ACTIVE'
+        && (!('startDate' in access(teamId).data) || access(teamId).data.startDate <= request.time)
+        && (!('endDate' in access(teamId).data) || access(teamId).data.endDate >= request.time);
+    }
+
     function can(teamId, roleId, permission) {
       return activeUser()
         && access(teamId).data.status == 'ACTIVE'
@@ -32,6 +39,14 @@ service cloud.firestore {
 
     match /userTeamAccess/{accessId} {
       allow read: if activeUser() && resource.data.userId == request.auth.uid;
+    }
+
+    match /teams/{teamId} {
+      allow read: if activeAccess(teamId);
+    }
+
+    match /seasons/{seasonId} {
+      allow read: if activeUser() && resource.data.status == 'ACTIVE' && resource.data.isActive == true;
     }
     // Les collections métier restent fermées tant que le rôle actif vérifiable
     // n'est pas transmis par une commande serveur ou un mécanisme validé.

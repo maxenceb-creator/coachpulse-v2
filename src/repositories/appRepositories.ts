@@ -28,7 +28,10 @@ export const repositories = {
         ])
       : Promise.resolve([]),
   activeSeason: () =>
-    many('seasons', seasonSchema, [where('isActive', '==', true)]),
+    many('seasons', seasonSchema, [
+      where('isActive', '==', true),
+      where('status', '==', 'ACTIVE'),
+    ]),
   assignmentsForTeam: (teamId: string, seasonId: string) =>
     many('playerTeamAssignments', assignmentSchema, [
       where('teamId', '==', teamId),
