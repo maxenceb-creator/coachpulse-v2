@@ -199,12 +199,11 @@ service cloud.firestore {
     }
 
     function canReadTestResult(data) {
-      let session = get(
-        /databases/$(database)/documents/testSessions/$(data.testSessionId)
-      );
-      return session.data.teamId == data.teamId
-        && session.data.seasonId == data.seasonId
-        && validTestReadContext(session.data);
+      let team = get(/databases/$(database)/documents/teams/$(data.teamId));
+      return canInSecurityContext(data.teamId, data.seasonId, 'tests.read')
+        && team.data.status == 'ACTIVE'
+        && team.data.teamType == 'DEVELOPMENT'
+        && team.data.seasonId == data.seasonId;
     }
 
     function canDeleteTestResult(data) {
