@@ -59,6 +59,7 @@ describe('comptage effectif des joueuses par Team', () => {
       playersService.countEffectiveByTeam(
         'team-dev-u13f',
         'season-2026-2027',
+        'role-coach-principal',
         effectiveAt,
       ),
     ).resolves.toBe(2)

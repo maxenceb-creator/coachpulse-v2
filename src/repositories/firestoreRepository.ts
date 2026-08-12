@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   query,
+  updateDoc,
   type QueryConstraint,
 } from 'firebase/firestore'
 import type { ZodType } from 'zod'
@@ -59,3 +60,9 @@ export async function many<T>(
   })
 }
 export { documentId }
+
+export async function update(path: string, id: string, data: object) {
+  return withDevFirestoreLog(`updateDoc ${path}/${id}`, () =>
+    updateDoc(doc(db, path, id), data),
+  )
+}

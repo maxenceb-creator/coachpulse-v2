@@ -6,11 +6,12 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthProvider'
 import { repositories } from '../repositories/appRepositories'
 import { canAccessTeam } from '../services/permissionsService'
 import { selectActiveId } from '../services/contextSelection'
+import { securityContextService } from '../services/securityContextService'
 import { keys } from '../hooks/queryKeys'
 import type { Role, Season, Team, TeamAccess, User } from '../types/domain'
 type V = {
@@ -23,6 +24,7 @@ type V = {
   setRole: (v: string) => void
   activeTeamId?: string
   setTeam: (v: string) => void
+  securityContextReady: boolean
   loading: boolean
   error: boolean
 }
@@ -96,10 +98,56 @@ export function AppContext({ children }: { children: ReactNode }) {
     queryFn: repositories.activeSeason,
     select: (s) => s[0],
   })
+  const contextMutation = useMutation({
+    mutationFn: (context: {
+      activeRoleId: string
+      activeTeamId: string
+      activeSeasonId: string
+    }) =>
+      securityContextService.select({
+        user: p!,
+        roles,
+        accesses,
+        ...context,
+      }),
+    onSuccess: (_, context) => {
+      if (import.meta.env.DEV) {
+        console.debug('[Security context DEV] Contexte vérifié', context)
+      }
+      client.setQueryData(keys.user(uid), (current: User | null | undefined) =>
+        current ? { ...current, securityContext: context } : current,
+      )
+      void client.removeQueries({ queryKey: ['players'] })
+    },
+  })
+  useEffect(() => {
+    if (
+      p &&
+      activeRoleId &&
+      activeTeamId &&
+      sq.data &&
+      !contextMutation.isPending &&
+      !contextMutation.isError &&
+      (p.securityContext?.activeRoleId !== activeRoleId ||
+        p.securityContext?.activeTeamId !== activeTeamId ||
+        p.securityContext?.activeSeasonId !== sq.data.seasonId)
+    ) {
+      contextMutation.mutate({
+        activeRoleId,
+        activeTeamId,
+        activeSeasonId: sq.data.seasonId,
+      })
+    }
+  }, [p, activeRoleId, activeTeamId, sq.data, contextMutation])
   const setRole = (v: string) => {
+    contextMutation.reset()
     setActiveRoleId(v)
     setActiveTeamId(undefined)
     void client.removeQueries({ queryKey: ['teams', uid] })
+  }
+  const setTeam = (v: string) => {
+    contextMutation.reset()
+    setActiveTeamId(v)
   }
   const queries = [uq, rq, aq, tq, sq]
   return (
@@ -113,9 +161,13 @@ export function AppContext({ children }: { children: ReactNode }) {
         activeRoleId,
         setRole,
         activeTeamId,
-        setTeam: setActiveTeamId,
+        setTeam,
+        securityContextReady:
+          p?.securityContext?.activeRoleId === activeRoleId &&
+          p?.securityContext?.activeTeamId === activeTeamId &&
+          p?.securityContext?.activeSeasonId === sq.data?.seasonId,
         loading: queries.some((q) => q.isLoading),
-        error: queries.some((q) => q.isError),
+        error: queries.some((q) => q.isError) || contextMutation.isError,
       }}
     >
       {children}

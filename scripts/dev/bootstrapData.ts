@@ -84,6 +84,18 @@ const assignmentSchema = z.object({
   ...metadata,
 })
 
+const playerAccessScopeSchema = z.object({
+  playerAccessScopeId: id,
+  playerId: id,
+  teamId: id,
+  seasonId: id,
+  status: z.literal('ACTIVE'),
+  startDate: timestamp,
+  endDate: timestamp.optional(),
+  source: z.literal('PLAYER_TEAM_ASSIGNMENT'),
+  ...metadata,
+})
+
 const rolePermissionSchema = z.object({
   permissions: z.array(z.string()),
   medicalAccessLevel: z.literal('NONE'),
@@ -107,6 +119,11 @@ const userSchema = z.object({
   status: z.literal('ACTIVE'),
   roleIds: z.array(id).min(2),
   preferredActiveRoleId: id,
+  securityContext: z.object({
+    activeRoleId: id,
+    activeTeamId: id,
+    activeSeasonId: id,
+  }),
   ...metadata,
 })
 
@@ -118,6 +135,7 @@ const datasetSchema = z.object({
   teams: z.array(teamSchema),
   players: z.array(playerSchema),
   playerTeamAssignments: z.array(assignmentSchema),
+  playerAccessScopes: z.array(playerAccessScopeSchema),
   users: z.array(userSchema).length(1),
   userTeamAccess: z.array(accessSchema),
 })
@@ -187,6 +205,22 @@ function validateBusinessInvariants(dataset: BootstrapDataset) {
   for (const assignment of dataset.playerTeamAssignments) {
     if (assignment.endDate && assignment.endDate < assignment.startDate) {
       throw new Error(`Période invalide pour ${assignment.assignmentId}.`)
+    }
+  }
+
+  const assignmentScopes = new Set(
+    dataset.playerTeamAssignments.map(
+      ({ playerId, teamId, seasonId }) => `${playerId}_${teamId}_${seasonId}`,
+    ),
+  )
+  const accessScopes = new Set(
+    dataset.playerAccessScopes.map(
+      ({ playerAccessScopeId }) => playerAccessScopeId,
+    ),
+  )
+  for (const scopeId of assignmentScopes) {
+    if (!accessScopes.has(scopeId)) {
+      throw new Error(`Scope d'autorisation manquant pour ${scopeId}.`)
     }
   }
 
@@ -474,6 +508,24 @@ export function buildBootstrapDataset(
         ...meta,
       },
     ],
+    playerAccessScopes: [
+      ['player-alice-martin', U13, '2026-08-01'],
+      ['player-emma-bernard', U13, '2026-08-01'],
+      ['player-emma-bernard', U14, '2026-09-01'],
+      ['player-lina-robert', U14, '2026-08-01'],
+      ['player-lina-robert', U13, '2026-10-01', '2026-10-31T23:59:59.999Z'],
+      ['player-nora-petit', FIRST_TEAM, '2026-08-01'],
+    ].map(([playerId, teamId, startDate, endDate]) => ({
+      playerAccessScopeId: `${playerId}_${teamId}_${SEASON}`,
+      playerId,
+      teamId,
+      seasonId: SEASON,
+      status: 'ACTIVE' as const,
+      startDate: new Date(startDate),
+      ...(endDate ? { endDate: new Date(endDate) } : {}),
+      source: 'PLAYER_TEAM_ASSIGNMENT' as const,
+      ...meta,
+    })),
     users: [
       {
         userId: uid,
@@ -483,6 +535,11 @@ export function buildBootstrapDataset(
         status: 'ACTIVE',
         roleIds: [ADMIN, COACH, ANALYST],
         preferredActiveRoleId: COACH,
+        securityContext: {
+          activeRoleId: COACH,
+          activeTeamId: U13,
+          activeSeasonId: SEASON,
+        },
         ...meta,
       },
     ],
@@ -513,6 +570,7 @@ export function seedEntries(dataset: BootstrapDataset) {
     teams: 'teamId',
     players: 'playerId',
     playerTeamAssignments: 'assignmentId',
+    playerAccessScopes: 'playerAccessScopeId',
     users: 'userId',
     userTeamAccess: 'userTeamAccessId',
   } as const satisfies Record<SeedCollection, string>

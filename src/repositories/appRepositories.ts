@@ -1,5 +1,5 @@
 import { where } from 'firebase/firestore'
-import { many, one, documentId } from './firestoreRepository'
+import { many, one, documentId, update } from './firestoreRepository'
 import {
   accessSchema,
   assignmentSchema,
@@ -11,6 +11,15 @@ import {
 } from '../validation/schemas'
 export const repositories = {
   user: (id: string) => one('users', id, userSchema),
+  setSecurityContext: (
+    userId: string,
+    activeRoleId: string,
+    activeTeamId: string,
+    activeSeasonId: string,
+  ) =>
+    update('users', userId, {
+      securityContext: { activeRoleId, activeTeamId, activeSeasonId },
+    }),
   roles: (ids: string[]) =>
     ids.length
       ? many('roles', roleSchema, [where(documentId(), 'in', ids.slice(0, 30))])

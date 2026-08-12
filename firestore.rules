@@ -11,6 +11,10 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'ACTIVE';
     }
 
+    function user() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function access(teamId) {
       return get(/databases/$(database)/documents/userTeamAccess/$(request.auth.uid + '_' + teamId));
     }
@@ -22,14 +26,52 @@ service cloud.firestore {
         && (!('endDate' in access(teamId).data) || access(teamId).data.endDate >= request.time);
     }
 
-    function can(teamId, roleId, permission) {
+    function validRole(roleId) {
+      return roleId in user().data.roleIds
+        && get(/databases/$(database)/documents/roles/$(roleId)).data.isActive == true;
+    }
+
+    function canInSecurityContext(teamId, seasonId, permission) {
+      let context = user().data.securityContext;
       return activeUser()
-        && access(teamId).data.status == 'ACTIVE'
-        && access(teamId).data.rolePermissions[roleId].permissions.hasAny([permission]);
+        && context.activeTeamId == teamId
+        && context.activeSeasonId == seasonId
+        && validRole(context.activeRoleId)
+        && activeAccess(teamId)
+        && context.activeRoleId in access(teamId).data.rolePermissions
+        && access(teamId).data.rolePermissions[context.activeRoleId].permissions.hasAny([permission]);
+    }
+
+    function validRequestedSecurityContext() {
+      let context = request.resource.data.securityContext;
+      return context.keys().hasOnly(['activeRoleId', 'activeTeamId', 'activeSeasonId'])
+        && validRole(context.activeRoleId)
+        && activeAccess(context.activeTeamId)
+        && context.activeRoleId in access(context.activeTeamId).data.rolePermissions
+        && get(/databases/$(database)/documents/teams/$(context.activeTeamId)).data.status == 'ACTIVE'
+        && get(/databases/$(database)/documents/seasons/$(context.activeSeasonId)).data.status == 'ACTIVE'
+        && get(/databases/$(database)/documents/seasons/$(context.activeSeasonId)).data.isActive == true;
+    }
+
+    function activePlayerScope(playerId, teamId, seasonId) {
+      let scope = get(
+        /databases/$(database)/documents/playerAccessScopes/$(playerId + '_' + teamId + '_' + seasonId)
+      );
+      return scope.data.playerId == playerId
+        && scope.data.teamId == teamId
+        && scope.data.seasonId == seasonId
+        && scope.data.source == 'PLAYER_TEAM_ASSIGNMENT'
+        && scope.data.status == 'ACTIVE'
+        && (!('startDate' in scope.data) || scope.data.startDate <= request.time)
+        && (!('endDate' in scope.data) || scope.data.endDate >= request.time);
     }
 
     match /users/{userId} {
       allow read: if activeUser() && request.auth.uid == userId;
+      allow update: if activeUser()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['securityContext'])
+        && validRequestedSecurityContext();
     }
 
     match /roles/{roleId} {
@@ -48,8 +90,30 @@ service cloud.firestore {
     match /seasons/{seasonId} {
       allow read: if activeUser() && resource.data.status == 'ACTIVE' && resource.data.isActive == true;
     }
-    // Les collections métier restent fermées tant que le rôle actif vérifiable
-    // n'est pas transmis par une commande serveur ou un mécanisme validé.
+
+    match /playerTeamAssignments/{assignmentId} {
+      allow read: if resource.data.status == 'ACTIVE'
+        && canInSecurityContext(resource.data.teamId, resource.data.seasonId, 'players.read');
+    }
+
+    match /playerAccessScopes/{scopeId} {
+      allow read, write: if false;
+    }
+
+    match /players/{playerId} {
+      allow read: if resource.data.status == 'ACTIVE'
+        && canInSecurityContext(
+          user().data.securityContext.activeTeamId,
+          user().data.securityContext.activeSeasonId,
+          'players.read'
+        )
+        && activePlayerScope(
+          playerId,
+          user().data.securityContext.activeTeamId,
+          user().data.securityContext.activeSeasonId
+        );
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -1611,6 +1611,27 @@ La V2 doit rester modulaire, testable, explicable et capable d’évoluer sans r
 
 Ce document constitue la référence technique V1.0 de CoachPulse V2.
 
+---
+
+# Addendum PR04 — contexte de rôle vérifiable
+
+Le rôle actif de sécurité est persisté dans `User.securityContext` avec la Team
+et la saison actives. Une écriture client très limitée est autorisée uniquement
+sur ce champ et entièrement revalidée par Firestore Rules contre `User.roleIds`,
+`Role.isActive`, `UserTeamAccess` et la saison active.
+
+Les custom claims ne sont pas retenus : les rôles, Teams et permissions sont
+dynamiques et leur modification ne doit pas imposer de renouvellement du token
+ou de redéploiement. Un contexte uniquement local n'est pas vérifiable par les
+Rules. Une commande serveur à chaque changement ajouterait de la latence sans
+renforcer la validation déjà exprimable dans les Rules.
+
+La vérification d'appartenance Player utilise `playerAccessScopes`, index
+d'autorisation serveur dérivé et déterministe. Firestore Rules ne peut pas
+interroger `playerTeamAssignments` par recherche lors d'un `get` Player ; cet
+index minimal permet un `exists/get` déterministe sans ajouter `teamId` comme
+vérité permanente dans Player.
+
 
 ---
 

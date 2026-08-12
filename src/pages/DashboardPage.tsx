@@ -4,7 +4,12 @@ import { usePlayerCount } from '../hooks/usePlayerCount'
 export function DashboardPage() {
   const { logout } = useAuth(),
     c = useApp(),
-    count = usePlayerCount(c.activeTeamId, c.season?.seasonId, c.activeRoleId)
+    count = usePlayerCount(
+      c.activeTeamId,
+      c.season?.seasonId,
+      c.activeRoleId,
+      c.securityContextReady,
+    )
   if (c.loading)
     return <main className="center">Chargement de votre espace…</main>
   if (c.error)
@@ -69,7 +74,11 @@ export function DashboardPage() {
             ['Saison active', c.season?.name],
             [
               'Joueuses accessibles',
-              count.isLoading ? '…' : String(count.data ?? 0),
+              count.isLoading
+                ? '…'
+                : count.isError
+                  ? 'Erreur de chargement'
+                  : String(count.data ?? 0),
             ],
           ].map(([a, b]) => (
             <article className="card" key={a}>
