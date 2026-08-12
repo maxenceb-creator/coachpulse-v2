@@ -243,6 +243,13 @@ Une TestSession commence `DRAFT`, puis devient `COMPLETED`. Une session
 utilisera une permission dédiée. La finalisation valide chaque TestResult
 réellement présent sans imposer un résultat aux joueuses non testées.
 
+## BR-071B — Suppression contrôlée PR07
+Une TestSession `DRAFT` ou `COMPLETED` peut être supprimée par un utilisateur
+disposant de `tests.write` dans la Team et la saison actives, après confirmation
+explicite. Une confirmation renforcée est exigée pour `COMPLETED`. La suppression
+physique retire atomiquement la TestSession et tous ses TestResults. Une permission
+de suppression dédiée pourra remplacer `tests.write` lors d'une évolution future.
+
 ## BR-072 — Plusieurs tentatives
 Les protocoles peuvent conserver plusieurs tentatives brutes.
 

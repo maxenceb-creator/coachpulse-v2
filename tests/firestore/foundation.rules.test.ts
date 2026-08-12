@@ -17,6 +17,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
   where,
 } from 'firebase/firestore'
 import { readFile } from 'node:fs/promises'
@@ -497,6 +498,72 @@ describe('Security Rules TestSession/TestResult PR07', () => {
         updatedAt: serverTimestamp(),
       }),
     )
+  })
+
+  it('autorise la suppression atomique DRAFT avec ses résultats', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'testResults/session-existing_player-a'))
+    batch.delete(doc(db, 'testSessions/session-existing'))
+    await assertSucceeds(batch.commit())
+  })
+
+  it('autorise la suppression confirmée côté UI d’une session COMPLETED', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(
+        doc(context.firestore(), 'testSessions/session-existing'),
+        { status: 'COMPLETED' },
+      )
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'testResults/session-existing_player-a'))
+    batch.delete(doc(db, 'testSessions/session-existing'))
+    await assertSucceeds(batch.commit())
+  })
+
+  it('refuse delete sans tests.write, autre Team ou autre saison', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('reader'),
+      }),
+    )
+    await assertFails(deleteDoc(doc(db, 'testSessions/session-existing')))
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      await setDoc(
+        doc(admin, 'testSessions/other-team'),
+        sessionData({ teamId: 'team-b', categoryId: 'category-b' }),
+      )
+      await setDoc(
+        doc(admin, 'testSessions/other-season'),
+        sessionData({ seasonId: 'other-season' }),
+      )
+    })
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('coach'),
+      }),
+    )
+    await assertFails(deleteDoc(doc(db, 'testSessions/other-team')))
+    await assertFails(deleteDoc(doc(db, 'testSessions/other-season')))
+  })
+
+  it('refuse la suppression d’un TestResult hors scope', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'testResults/out-of-scope'), {
+        testSessionId: 'session-existing',
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        playerId: 'player-b',
+        teamId: 'team-b',
+        seasonId,
+      })
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertFails(deleteDoc(doc(db, 'testResults/out-of-scope')))
   })
 })
 

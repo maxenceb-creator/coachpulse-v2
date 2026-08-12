@@ -1670,3 +1670,7 @@ vérité permanente dans Player.
 - La saisie reste locale jusqu'à une sauvegarde explicite. Les résultats sont
   écrits en batch et la finalisation ajoute atomiquement le changement de
   statut de la session.
+- La suppression physique d'une TestSession est une action explicite et
+  confirmée, autorisée en PR07 avec `tests.write` pour `DRAFT` et `COMPLETED`.
+  Tous les TestResults liés et la session sont supprimés dans un même batch ;
+  une permission dédiée pourra être introduite ultérieurement.

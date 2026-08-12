@@ -177,6 +177,11 @@ La finalisation écrit les résultats présents et passe la session à COMPLETED
 dans un même batch. Les saisies clavier locales ne déclenchent pas une écriture
 Firestore à chaque frappe.
 
+La suppression confirmée d'une TestSession supprime ses TestResults puis la
+TestSession dans un même batch atomique. PR07 refuse l'opération au-delà de 499
+résultats liés afin de respecter la limite de 500 opérations du batch sans
+introduire de suppression partielle.
+
 ## matches
 `matches/{matchId}` contient seasonId, teamId, date, adversaire, format, configuration des périodes, orientation, status et possession initiale.
 

@@ -199,3 +199,49 @@ export const useCreateTestSession = (context: TestHookContext) => {
       }),
   })
 }
+
+export const useDeleteTestSession = (context: TestHookContext) => {
+  const client = useQueryClient()
+  const sessionsKey = queryKeys.tests.sessions(
+    context.uid,
+    context.roleId,
+    context.teamId,
+    context.seasonId,
+  )
+  return useMutation({
+    mutationFn: (testSessionId: string) =>
+      testsService.deleteSession(
+        security(context),
+        testSessionId,
+        context.seasonId,
+      ),
+    onSuccess: (deleted) => {
+      client.setQueryData<TestSession[]>(sessionsKey, (sessions = []) =>
+        sessions.filter(
+          ({ testSessionId }) => testSessionId !== deleted.testSessionId,
+        ),
+      )
+      client.removeQueries({
+        queryKey: queryKeys.tests.session(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+          deleted.testSessionId,
+        ),
+        exact: true,
+      })
+      client.removeQueries({
+        queryKey: queryKeys.tests.results(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+          deleted.testSessionId,
+        ),
+        exact: true,
+      })
+      void client.invalidateQueries({ queryKey: sessionsKey, exact: true })
+    },
+  })
+}

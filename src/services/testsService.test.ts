@@ -69,8 +69,10 @@ const repositoryMock = () => ({
   getSessionById: vi.fn(),
   listSessions: vi.fn().mockResolvedValue([]),
   getResultsBySession: vi.fn().mockResolvedValue([]),
+  getResultsForDeletion: vi.fn().mockResolvedValue([]),
   saveResults: vi.fn().mockResolvedValue(undefined),
   completeSession: vi.fn().mockResolvedValue(undefined),
+  deleteSessionWithResults: vi.fn().mockResolvedValue(undefined),
   assignmentsForTeam: vi.fn().mockResolvedValue([]),
   activePlayers: vi.fn().mockResolvedValue([]),
 })
@@ -308,6 +310,84 @@ describe('testsService', () => {
         testDefinitionVersion: definition.version + 1,
       }),
     ).rejects.toMatchObject({ code: 'TEST_DEFINITION_VERSION_MISMATCH' })
+  })
+
+  it('supprime atomiquement une session sans résultat', async () => {
+    const repository = repositoryMock()
+    const session = {
+      testSessionId: 'session',
+      testDefinitionId: definition.testDefinitionId,
+      testDefinitionVersion: 1,
+      teamId: 'team',
+      seasonId: 'season-2026',
+      categoryId: 'category',
+      date: now,
+      status: 'DRAFT' as const,
+      createdBy: 'user',
+      createdAt: now,
+      updatedAt: now,
+    }
+    repository.getSessionById.mockResolvedValue(session)
+    const service = createTestsService(repository)
+
+    await expect(
+      service.deleteSession(
+        { userId: 'user', activeRoleId: 'coach', teamId: 'team', accesses },
+        session.testSessionId,
+        session.seasonId,
+      ),
+    ).resolves.toEqual(session)
+    expect(repository.deleteSessionWithResults).toHaveBeenCalledWith(
+      session,
+      [],
+    )
+  })
+
+  it('supprime plusieurs résultats avec la session et propage une erreur de batch', async () => {
+    const repository = repositoryMock()
+    const session = {
+      testSessionId: 'session',
+      testDefinitionId: definition.testDefinitionId,
+      testDefinitionVersion: 1,
+      teamId: 'team',
+      seasonId: 'season-2026',
+      categoryId: 'category',
+      date: now,
+      status: 'COMPLETED' as const,
+      createdBy: 'user',
+      createdAt: now,
+      updatedAt: now,
+    }
+    const results = [
+      { testResultId: 'session_alice' },
+      { testResultId: 'session_emma' },
+    ] as never[]
+    repository.getSessionById.mockResolvedValue(session)
+    repository.getResultsForDeletion.mockResolvedValue(results)
+    const service = createTestsService(repository)
+
+    await expect(
+      service.deleteSession(
+        { userId: 'user', activeRoleId: 'coach', teamId: 'team', accesses },
+        session.testSessionId,
+        session.seasonId,
+      ),
+    ).resolves.toEqual(session)
+    expect(repository.deleteSessionWithResults).toHaveBeenCalledWith(
+      session,
+      results,
+    )
+
+    repository.deleteSessionWithResults.mockRejectedValueOnce(
+      new Error('batch failed'),
+    )
+    await expect(
+      service.deleteSession(
+        { userId: 'user', activeRoleId: 'coach', teamId: 'team', accesses },
+        session.testSessionId,
+        session.seasonId,
+      ),
+    ).rejects.toThrow('batch failed')
   })
 
   it('sauvegarde zéro sous un ID déterministe et refuse une joueuse hors scope', async () => {

@@ -5,11 +5,13 @@ import { useTestDefinitions } from '../hooks/useTestDefinitions'
 import { useState } from 'react'
 import {
   useCreateTestSession,
+  useDeleteTestSession,
   useTestSessions,
   type TestHookContext,
 } from '../hooks/useTestSession'
 import { TestDefinitionCard } from '../components/TestDefinitionCard'
 import { hasPermission } from '../services/permissionsService'
+import { TestSessionCard } from '../components/TestSessionCard'
 
 export function TestsPage() {
   const { user } = useAuth()
@@ -28,6 +30,7 @@ export function TestsPage() {
   }
   const sessions = useTestSessions(hookContext)
   const createSession = useCreateTestSession(hookContext)
+  const deleteSession = useDeleteTestSession(hookContext)
   const activeTeam = context.teams.find(
     ({ teamId }) => teamId === context.activeTeamId,
   )
@@ -103,18 +106,35 @@ export function TestsPage() {
         </label>
         <section className="tests-domain">
           <h2>Sessions récentes</h2>
+          {deleteSession.isSuccess ? <p>Session supprimée.</p> : null}
+          {deleteSession.isError ? (
+            <p className="error">Impossible de supprimer la session.</p>
+          ) : null}
           {sessions.data?.length ? (
             <div className="session-list">
-              {sessions.data.map((session) => (
-                <Link
-                  className="card module-link"
-                  key={session.testSessionId}
-                  to={`/tests/sessions/${session.testSessionId}`}
-                >
-                  <strong>{session.date.toLocaleDateString('fr-FR')}</strong>
-                  <span>{session.status}</span>
-                </Link>
-              ))}
+              {sessions.data.map((session) => {
+                const definitionName = definitions.data?.find(
+                  ({ testDefinitionId, version }) =>
+                    testDefinitionId === session.testDefinitionId &&
+                    version === session.testDefinitionVersion,
+                )?.name
+                return (
+                  <TestSessionCard
+                    canDelete={canWriteTests}
+                    definitionName={definitionName ?? 'Protocole introuvable'}
+                    deleting={
+                      deleteSession.isPending &&
+                      deleteSession.variables === session.testSessionId
+                    }
+                    key={session.testSessionId}
+                    session={session}
+                    onDelete={(testSessionId) => {
+                      if (!canWriteTests || deleteSession.isPending) return
+                      deleteSession.mutate(testSessionId)
+                    }}
+                  />
+                )
+              })}
             </div>
           ) : (
             <p className="card empty-state">Aucune session dans ce contexte.</p>

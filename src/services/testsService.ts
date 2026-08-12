@@ -33,6 +33,7 @@ export class TestsDomainError extends Error {
       | 'BENCHMARK_VALUE_OUT_OF_RANGE'
       | 'TEST_SESSION_NOT_FOUND'
       | 'TEST_SESSION_NOT_EDITABLE'
+      | 'TEST_SESSION_DELETE_TOO_LARGE'
       | 'TEST_DEFINITION_VERSION_MISMATCH'
       | 'TEST_CONTEXT_MISMATCH'
       | 'PLAYER_NOT_ELIGIBLE'
@@ -297,6 +298,26 @@ export const createTestsService = (repository: TestsServiceRepository) => ({
       session.teamId,
       session.seasonId,
     )
+  },
+  async deleteSession(
+    context: TestsSecurityContext,
+    testSessionId: string,
+    seasonId: string,
+  ) {
+    requireTestsWrite(context)
+    const session = await repository.getSessionById(testSessionId)
+    if (!session) throw new TestsDomainError('TEST_SESSION_NOT_FOUND')
+    if (session.teamId !== context.teamId || session.seasonId !== seasonId)
+      throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
+    const results = await repository.getResultsForDeletion(
+      session.testSessionId,
+      session.teamId,
+      session.seasonId,
+    )
+    if (results.length > 499)
+      throw new TestsDomainError('TEST_SESSION_DELETE_TOO_LARGE')
+    await repository.deleteSessionWithResults(session, results)
+    return session
   },
   async saveResults(
     context: TestsSecurityContext,

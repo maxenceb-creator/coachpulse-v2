@@ -13,6 +13,7 @@ import {
 } from '../validation/schemas'
 import {
   commitWrites,
+  deleteMany,
   many,
   one,
   set,
@@ -43,8 +44,17 @@ export interface TestsRepository {
     teamId: string,
     seasonId: string,
   ): Promise<TestResult[]>
+  getResultsForDeletion(
+    testSessionId: string,
+    teamId: string,
+    seasonId: string,
+  ): Promise<TestResult[]>
   saveResults(results: TestResult[]): Promise<void>
   completeSession(session: TestSession, results: TestResult[]): Promise<void>
+  deleteSessionWithResults(
+    session: TestSession,
+    results: TestResult[],
+  ): Promise<void>
 }
 
 export const testsRepository: TestsRepository = {
@@ -90,6 +100,13 @@ export const testsRepository: TestsRepository = {
       where('seasonId', '==', seasonId),
       limit(100),
     ]),
+  getResultsForDeletion: (testSessionId, teamId, seasonId) =>
+    many('testResults', testResultSchema, [
+      where('testSessionId', '==', testSessionId),
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      limit(500),
+    ]),
   saveResults: (results) =>
     setMany(
       results.map((value) => ({
@@ -119,4 +136,12 @@ export const testsRepository: TestsRepository = {
         },
       ],
     ),
+  deleteSessionWithResults: (session, results) =>
+    deleteMany([
+      ...results.map((result) => ({
+        path: 'testResults',
+        id: result.testResultId,
+      })),
+      { path: 'testSessions', id: session.testSessionId },
+    ]),
 }

@@ -106,3 +106,11 @@ export async function commitWrites(
     await batch.commit()
   })
 }
+
+export async function deleteMany(deletes: { path: string; id: string }[]) {
+  return withDevFirestoreLog('deleteBatch', async () => {
+    const batch = writeBatch(db)
+    deletes.forEach((item) => batch.delete(doc(db, item.path, item.id)))
+    await batch.commit()
+  })
+}

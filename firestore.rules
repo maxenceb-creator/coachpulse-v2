@@ -190,6 +190,17 @@ service cloud.firestore {
         && validTestReadContext(session.data);
     }
 
+    function canDeleteTestResult(data) {
+      let session = get(
+        /databases/$(database)/documents/testSessions/$(data.testSessionId)
+      );
+      return data.teamId == session.data.teamId
+        && data.seasonId == session.data.seasonId
+        && data.testDefinitionId == session.data.testDefinitionId
+        && data.testDefinitionVersion == session.data.testDefinitionVersion
+        && validTestTeamContext(session.data, 'tests.write');
+    }
+
     match /users/{userId} {
       allow read: if activeUser() && request.auth.uid == userId;
       allow update: if activeUser()
@@ -257,14 +268,14 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
         && request.resource.data.status == 'COMPLETED'
         && request.resource.data.updatedAt == request.time;
-      allow delete: if false;
+      allow delete: if validTestTeamContext(resource.data, 'tests.write');
     }
 
     match /testResults/{testResultId} {
       allow read: if canReadTestResult(resource.data);
       allow create: if validTestResult(testResultId, true);
       allow update: if validTestResult(testResultId, false);
-      allow delete: if false;
+      allow delete: if canDeleteTestResult(resource.data);
     }
 
     match /{document=**} {
