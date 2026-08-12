@@ -38,6 +38,7 @@ export interface TestsCatalogueRepository {
     definitionId: string,
     version: number,
     seasonId: string,
+    subCategoryIds: string[],
   ): Promise<TestBenchmark[]>
   createBenchmark(value: TestBenchmark): Promise<void>
   getBenchmark(id: string): Promise<TestBenchmark | null>
@@ -88,13 +89,20 @@ export const testsCatalogueRepository: TestsCatalogueRepository = {
     const { testDefinitionId, ...data } = value
     return createIfAbsent('testDefinitions', testDefinitionId, defined(data))
   },
-  listBenchmarks: (definitionId, version, seasonId) =>
-    many('testBenchmarks', testBenchmarkSchema, [
-      where('testDefinitionId', '==', definitionId),
-      where('testDefinitionVersion', '==', version),
-      where('seasonId', '==', seasonId),
-      limit(100),
-    ]),
+  listBenchmarks: async (definitionId, version, seasonId, subCategoryIds) =>
+    (
+      await Promise.all(
+        subCategoryIds.map((subCategoryId) =>
+          many('testBenchmarks', testBenchmarkSchema, [
+            where('testDefinitionId', '==', definitionId),
+            where('testDefinitionVersion', '==', version),
+            where('seasonId', '==', seasonId),
+            where('subCategoryId', '==', subCategoryId),
+            limit(100),
+          ]),
+        ),
+      )
+    ).flat(),
   createBenchmark: (value) => {
     const { testBenchmarkId, ...data } = value
     return createIfAbsent('testBenchmarks', testBenchmarkId, defined(data))

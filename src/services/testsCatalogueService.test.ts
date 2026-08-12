@@ -168,6 +168,38 @@ describe('testsCatalogueService', () => {
     ).rejects.toMatchObject({ code: 'BENCHMARK_DUPLICATE' })
   })
 
+  it('refuse une métrique seulement locale absente de la définition persistée', async () => {
+    const repo = repository(definition({ metrics: [] }))
+    const service = createTestsCatalogueService(repo)
+
+    await expect(
+      service.createBenchmark(context(), {
+        testDefinitionId: 'test-generic-v1',
+        testDefinitionVersion: 1,
+        metricKey: 'HEIGHT',
+        subCategoryId: 'u13',
+        seasonId: 'season',
+        benchmarkLevel: 'TARGET',
+        targetValue: 35,
+      }),
+    ).rejects.toMatchObject({ code: 'BENCHMARK_INVALID' })
+    expect(repo.createBenchmark).not.toHaveBeenCalled()
+  })
+
+  it('limite la lecture des benchmarks aux sous-catégories de la Category active', async () => {
+    const repo = repository()
+    const service = createTestsCatalogueService(repo)
+
+    await service.listBenchmarks(context(), 'test-generic-v1', 1)
+
+    expect(repo.listBenchmarks).toHaveBeenCalledWith(
+      'test-generic-v1',
+      1,
+      'season',
+      ['u13'],
+    )
+  })
+
   it('charge les sous-catégories canoniques de la Category et de la saison', async () => {
     const repo = repository()
     vi.mocked(repo.getCategory).mockResolvedValue({

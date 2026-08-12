@@ -255,7 +255,12 @@ export const createTestsCatalogueService = (
       version: number,
     ) {
       requireManage(context)
-      return repository.listBenchmarks(id, version, context.seasonId)
+      return repository.listBenchmarks(
+        id,
+        version,
+        context.seasonId,
+        await allowedSubCategoryIds(context),
+      )
     },
     async createBenchmark(
       context: CatalogueSecurityContext,

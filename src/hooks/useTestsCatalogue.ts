@@ -151,12 +151,38 @@ export const useTestsCatalogueMutations = (
       onSuccess: () => invalidate(),
     }),
     createBenchmark: useMutation({
-      mutationFn: (
+      mutationFn: async (
         input: Omit<
           TestBenchmark,
           'testBenchmarkId' | 'status' | 'createdAt' | 'updatedAt' | 'createdBy'
         >,
-      ) => testsCatalogueService.createBenchmark(context, input),
+      ) => {
+        if (import.meta.env.DEV)
+          console.debug('[TestCatalogueAdmin DEV] Benchmark create start', {
+            documentId: [
+              'benchmark',
+              input.seasonId,
+              input.subCategoryId,
+              input.testDefinitionId,
+              `v${input.testDefinitionVersion}`,
+              input.metricKey,
+              input.benchmarkLevel,
+            ].join('_'),
+            ...input,
+          })
+        try {
+          return await testsCatalogueService.createBenchmark(context, input)
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            const failure = error as Error & { code?: string }
+            console.error('[TestCatalogueAdmin DEV] Benchmark create error', {
+              code: failure.code ?? 'UNKNOWN',
+              message: failure.message,
+            })
+          }
+          throw error
+        }
+      },
       onSuccess: () =>
         client.invalidateQueries({
           queryKey: [

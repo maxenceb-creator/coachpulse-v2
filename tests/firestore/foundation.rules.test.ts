@@ -429,6 +429,34 @@ describe('Security Rules administration Tests PR09', () => {
       securityContext: securityContext('manager'),
     })
     await assertSucceeds(setDoc(doc(db, 'testBenchmarks/new-target'), data))
+    await assertSucceeds(
+      updateDoc(doc(db, 'testBenchmarks/new-target'), {
+        status: 'ARCHIVED',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    const visibleBenchmarks = await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          where('testDefinitionVersion', '==', 1),
+          where('seasonId', '==', seasonId),
+          where('subCategoryId', '==', 'subcat-a'),
+        ),
+      ),
+    )
+    expect(visibleBenchmarks.docs.map(({ id }) => id)).toEqual(['new-target'])
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          where('testDefinitionVersion', '==', 1),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
     await assertFails(
       setDoc(doc(db, 'testBenchmarks/outside-target'), {
         ...data,

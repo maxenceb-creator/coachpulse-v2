@@ -17,6 +17,10 @@ import type {
   TestMetricDefinition,
 } from '../types/domain'
 import { resolveTestDefinitionAdminViewState } from './testDefinitionAdminState'
+import {
+  benchmarkCreationErrorMessage,
+  hasUnsavedBenchmarkMetrics,
+} from './testBenchmarkAdminState'
 
 function BenchmarkRow({
   item,
@@ -157,6 +161,7 @@ export function TestDefinitionAdminPage() {
       <main className="center error">Impossible de charger le protocole.</main>
     )
   if (!detail.data) return null
+  const persistedDefinition = detail.data.definition
   const definition =
     draft ??
     ({
@@ -164,6 +169,10 @@ export function TestDefinitionAdminPage() {
       metrics: sortTestMetrics(detail.data.definition.metrics),
     } satisfies TestDefinition)
   const editable = definition.status === 'DRAFT'
+  const benchmarkMetricsAreUnsaved = hasUnsavedBenchmarkMetrics(
+    definition.metrics,
+    persistedDefinition.metrics,
+  )
   const changeMetric = (index: number, patch: Partial<TestMetricDefinition>) =>
     setDraft({
       ...definition,
@@ -501,8 +510,8 @@ export function TestDefinitionAdminPage() {
             onSubmit={(event) => {
               event.preventDefault()
               mutations.createBenchmark.mutate({
-                testDefinitionId: definition.testDefinitionId,
-                testDefinitionVersion: definition.version,
+                testDefinitionId: persistedDefinition.testDefinitionId,
+                testDefinitionVersion: persistedDefinition.version,
                 seasonId: context.seasonId,
                 subCategoryId: benchmark.subCategoryId,
                 metricKey: benchmark.metricKey,
@@ -556,7 +565,7 @@ export function TestDefinitionAdminPage() {
                 }
               >
                 <option value="">Choisir</option>
-                {definition.metrics.map((metric) => (
+                {persistedDefinition.metrics.map((metric) => (
                   <option key={metric.metricKey}>{metric.metricKey}</option>
                 ))}
               </select>
@@ -594,12 +603,26 @@ export function TestDefinitionAdminPage() {
                 }
               />
             </label>
-            <button>Ajouter</button>
+            <button disabled={benchmarkMetricsAreUnsaved}>Ajouter</button>
+            {benchmarkMetricsAreUnsaved ? (
+              <p className="error">
+                Sauvegardez les métriques du brouillon avant de créer un
+                benchmark.
+              </p>
+            ) : null}
             {mutations.createBenchmark.isError ? (
-              <p className="error">Benchmark invalide ou déjà actif.</p>
+              <p className="error">
+                {benchmarkCreationErrorMessage(mutations.createBenchmark.error)}
+              </p>
             ) : null}
           </form>
-          {benchmarks.data?.length ? (
+          {benchmarks.isPending ? (
+            <p className="card empty-state">Chargement des benchmarks…</p>
+          ) : benchmarks.isError ? (
+            <p className="card error">
+              Impossible de charger les benchmarks du contexte actif.
+            </p>
+          ) : benchmarks.data?.length ? (
             <div className="admin-table-wrap card">
               <table className="entry-table">
                 <tbody>
