@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { definitionUpdatePayload } from './testsCatalogueRepository'
+
+vi.mock('../config/firebase', () => ({ db: {} }))
 
 describe('testsCatalogueRepository', () => {
   it('n’envoie que les champs modifiables et retire les undefined imbriqués', () => {
