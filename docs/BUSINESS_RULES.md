@@ -199,11 +199,12 @@ Un nouveau protocole doit pouvoir être ajouté sans modifier le moteur central.
 ## BR-060 — Plusieurs mesures
 Un test peut comporter une ou plusieurs mesures.
 
-## BR-061 — MeasurementDefinition
+## BR-061 — MetricDefinition
 Chaque mesure définit clé, label, type, unité, obligation et direction de performance.
 
 ## BR-062 — Types de valeur
-Au minimum : `INTEGER`, `DECIMAL`, `BOOLEAN`.
+PR06 introduit le type canonique `NUMBER` pour les mesures numériques. Les
+types futurs ne seront ajoutés qu'avec leurs règles de validation explicites.
 
 ## BR-063 — Unités
 Les unités sont normalisées et définies par protocole.
@@ -279,6 +280,9 @@ Même protocole/version, même mesure et même unité sont requis pour une compa
 
 ## BR-087 — Versionnement protocole
 Une modification majeure du protocole crée une nouvelle version.
+
+`TestDefinition.version` est un entier positif. TestSession, TestResult et
+TestBenchmark conservent la version de protocole utilisée.
 
 ## BR-088 — Modification mineure
 Un changement purement visuel peut conserver la version.

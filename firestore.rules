@@ -42,6 +42,30 @@ service cloud.firestore {
         && access(teamId).data.rolePermissions[context.activeRoleId].permissions.hasAny([permission]);
     }
 
+    function canInActiveSecurityContext(permission) {
+      let context = user().data.securityContext;
+      return canInSecurityContext(
+        context.activeTeamId,
+        context.activeSeasonId,
+        permission
+      );
+    }
+
+    function benchmarkInActiveCategory(benchmark) {
+      let context = user().data.securityContext;
+      let team = get(/databases/$(database)/documents/teams/$(context.activeTeamId));
+      let category = get(/databases/$(database)/documents/categories/$(team.data.categoryId));
+      let subCategory = get(
+        /databases/$(database)/documents/subCategories/$(benchmark.subCategoryId)
+      );
+      return team.data.teamType == 'DEVELOPMENT'
+        && team.data.seasonId == context.activeSeasonId
+        && category.data.seasonId == context.activeSeasonId
+        && benchmark.subCategoryId in category.data.subCategoryIds
+        && benchmark.seasonId == context.activeSeasonId
+        && subCategory.data.seasonId == context.activeSeasonId;
+    }
+
     function validRequestedSecurityContext() {
       let context = request.resource.data.securityContext;
       return context.keys().hasOnly(['activeRoleId', 'activeTeamId', 'activeSeasonId'])
@@ -112,6 +136,17 @@ service cloud.firestore {
           user().data.securityContext.activeTeamId,
           user().data.securityContext.activeSeasonId
         );
+    }
+
+    match /testDefinitions/{testDefinitionId} {
+      allow read: if canInActiveSecurityContext('tests.read');
+      allow write: if false;
+    }
+
+    match /testBenchmarks/{testBenchmarkId} {
+      allow read: if canInActiveSecurityContext('tests.read')
+        && benchmarkInActiveCategory(resource.data);
+      allow write: if false;
     }
 
     match /{document=**} {

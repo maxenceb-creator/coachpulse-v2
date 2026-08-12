@@ -1,6 +1,8 @@
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../app/AppContext'
 import { usePlayerCount } from '../hooks/usePlayerCount'
+import { Link } from 'react-router-dom'
+import { hasPermission } from '../services/permissionsService'
 export function DashboardPage() {
   const { user, logout } = useAuth(),
     c = useApp(),
@@ -20,7 +22,18 @@ export function DashboardPage() {
   if (!c.profile)
     return <main className="center error">Aucun profil applicatif actif.</main>
   const role = c.roles.find((r) => r.roleId === c.activeRoleId),
-    team = c.teams.find((t) => t.teamId === c.activeTeamId)
+    team = c.teams.find((t) => t.teamId === c.activeTeamId),
+    canReadTests = Boolean(
+      user &&
+      c.activeRoleId &&
+      c.activeTeamId &&
+      hasPermission(c.accesses, {
+        userId: user.uid,
+        activeRoleId: c.activeRoleId,
+        teamId: c.activeTeamId,
+        permissionKey: 'tests.read',
+      }),
+    )
   return (
     <>
       <header>
@@ -88,6 +101,14 @@ export function DashboardPage() {
             </article>
           ))}
         </section>
+        {canReadTests ? (
+          <section className="module-links">
+            <Link className="card module-link" to="/tests">
+              <span>Module métier</span>
+              <strong>Tests techniques et athlétiques</strong>
+            </Link>
+          </section>
+        ) : null}
       </main>
     </>
   )

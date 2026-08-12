@@ -79,7 +79,10 @@ beforeEach(async () => {
         teamId: 'team-a',
         status: 'ACTIVE',
         rolePermissions: {
-          coach: { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
+          coach: {
+            permissions: ['players.read', 'tests.read'],
+            medicalAccessLevel: 'NONE',
+          },
           analyst: { permissions: [], medicalAccessLevel: 'NONE' },
           'inactive-role': {
             permissions: ['players.read'],
@@ -92,7 +95,10 @@ beforeEach(async () => {
         teamId: 'team-b',
         status: 'ACTIVE',
         rolePermissions: {
-          coach: { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
+          coach: {
+            permissions: ['players.read', 'tests.read'],
+            medicalAccessLevel: 'NONE',
+          },
         },
       }),
       write('userTeamAccess/user-disabled_team-a', {
@@ -100,7 +106,10 @@ beforeEach(async () => {
         teamId: 'team-a',
         status: 'ACTIVE',
         rolePermissions: {
-          coach: { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
+          coach: {
+            permissions: ['players.read', 'tests.read'],
+            medicalAccessLevel: 'NONE',
+          },
         },
       }),
       write('userTeamAccess/user-expired_team-a', {
@@ -109,7 +118,10 @@ beforeEach(async () => {
         status: 'ACTIVE',
         endDate: new Date('2020-01-01T00:00:00.000Z'),
         rolePermissions: {
-          coach: { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
+          coach: {
+            permissions: ['players.read', 'tests.read'],
+            medicalAccessLevel: 'NONE',
+          },
         },
       }),
       write('userTeamAccess/user-forged-role_team-a', {
@@ -120,8 +132,52 @@ beforeEach(async () => {
           admin: { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
         },
       }),
-      write('teams/team-a', { name: 'A', status: 'ACTIVE' }),
-      write('teams/team-b', { name: 'B', status: 'ACTIVE' }),
+      write('teams/team-a', {
+        name: 'A',
+        teamType: 'DEVELOPMENT',
+        categoryId: 'category-a',
+        seasonId,
+        status: 'ACTIVE',
+      }),
+      write('teams/team-b', {
+        name: 'B',
+        teamType: 'DEVELOPMENT',
+        categoryId: 'category-b',
+        seasonId,
+        status: 'ACTIVE',
+      }),
+      write('categories/category-a', {
+        seasonId,
+        subCategoryIds: ['subcat-a'],
+        status: 'ACTIVE',
+      }),
+      write('categories/category-b', {
+        seasonId,
+        subCategoryIds: ['subcat-b'],
+        status: 'ACTIVE',
+      }),
+      write('subCategories/subcat-a', { seasonId, name: 'U13' }),
+      write('subCategories/subcat-b', { seasonId, name: 'U14' }),
+      write('testDefinitions/juggling-v1', {
+        status: 'ACTIVE',
+        version: 1,
+      }),
+      write('testBenchmarks/benchmark-a', {
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        metricKey: 'STRONG_FOOT',
+        subCategoryId: 'subcat-a',
+        seasonId,
+        status: 'ACTIVE',
+      }),
+      write('testBenchmarks/benchmark-b', {
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        metricKey: 'STRONG_FOOT',
+        subCategoryId: 'subcat-b',
+        seasonId,
+        status: 'ACTIVE',
+      }),
       write(`seasons/${seasonId}`, {
         name: '2026-2027',
         status: 'ACTIVE',
@@ -158,6 +214,81 @@ beforeEach(async () => {
         source: 'PLAYER_TEAM_ASSIGNMENT',
       }),
     ])
+  })
+})
+
+describe('Security Rules du domaine Tests PR06', () => {
+  const definitions = (uid?: string) => {
+    const db = uid
+      ? testEnv.authenticatedContext(uid).firestore()
+      : testEnv.unauthenticatedContext().firestore()
+    return getDocs(
+      query(collection(db, 'testDefinitions'), where('status', '==', 'ACTIVE')),
+    )
+  }
+
+  it('refuse les lectures non authentifiées et les utilisateurs désactivés', async () => {
+    await assertFails(definitions())
+    await assertFails(definitions('user-disabled'))
+  })
+
+  it('refuse un rôle sans tests.read et la falsification du rôle actif', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('analyst'),
+      }),
+    )
+    await assertFails(definitions('user-a'))
+    await assertFails(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('admin'),
+      }),
+    )
+  })
+
+  it('autorise tests.read dans le contexte Team actif', async () => {
+    await assertSucceeds(definitions('user-a'))
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(getDoc(doc(db, 'testDefinitions/juggling-v1')))
+    await assertSucceeds(getDoc(doc(db, 'testBenchmarks/benchmark-a')))
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('status', '==', 'ACTIVE'),
+          where('subCategoryId', '==', 'subcat-a'),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
+  })
+
+  it('refuse un benchmark hors de la Category active', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertFails(getDoc(doc(db, 'testBenchmarks/benchmark-b')))
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('status', '==', 'ACTIVE'),
+          where('subCategoryId', '==', 'subcat-b'),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
+  })
+
+  it('refuse toute écriture client sur les définitions et benchmarks', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertFails(
+      setDoc(doc(db, 'testDefinitions/new-test'), { status: 'ACTIVE' }),
+    )
+    await assertFails(
+      setDoc(doc(db, 'testBenchmarks/new-benchmark'), {
+        status: 'ACTIVE',
+      }),
+    )
   })
 })
 

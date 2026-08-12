@@ -113,6 +113,37 @@ describe('cycle de vie du cache privé', () => {
     ).toBe(3)
   })
 
+  it('retire les définitions et benchmarks Tests du contexte quitté', async () => {
+    const u13Definitions = queryKeys.tests.definitions(
+      'user-a',
+      'coach',
+      'u13',
+      '2026',
+    )
+    const u13Benchmarks = queryKeys.tests.benchmarks(
+      'user-a',
+      'coach',
+      'u13',
+      '2026',
+      'subcat-u13',
+    )
+    const u14Definitions = queryKeys.tests.definitions(
+      'user-a',
+      'coach',
+      'u14',
+      '2026',
+    )
+    client.setQueryData(u13Definitions, ['jongles'])
+    client.setQueryData(u13Benchmarks, [50])
+    client.setQueryData(u14Definitions, ['sprint'])
+
+    await removeTeamScopedQueries(client, 'user-a', 'coach', 'u13')
+
+    expect(client.getQueryData(u13Definitions)).toBeUndefined()
+    expect(client.getQueryData(u13Benchmarks)).toBeUndefined()
+    expect(client.getQueryData(u14Definitions)).toEqual(['sprint'])
+  })
+
   it('retire tout contexte protégé différent du securityContext confirmé', async () => {
     client.setQueryData(
       queryKeys.players.count('user-a', 'coach', 'u13', '2026'),
@@ -177,6 +208,29 @@ describe('query keys privées', () => {
   it('isole la liste Teams quand les TeamAccess effectifs changent', () => {
     expect(queryKeys.teams('user-a', 'coach', ['u13'])).not.toEqual(
       queryKeys.teams('user-a', 'coach', ['u13', 'u14']),
+    )
+  })
+  it('isole Tests par contexte et benchmarks par sous-catégorie', () => {
+    const base = queryKeys.tests.definitions('user-a', 'coach', 'u13', '2026')
+    expect(
+      queryKeys.tests.definitions('user-a', 'coach', 'u14', '2026'),
+    ).not.toEqual(base)
+    expect(
+      queryKeys.tests.benchmarks(
+        'user-a',
+        'coach',
+        'u13',
+        '2026',
+        'subcat-u13',
+      ),
+    ).not.toEqual(
+      queryKeys.tests.benchmarks(
+        'user-a',
+        'coach',
+        'u13',
+        '2026',
+        'subcat-u14',
+      ),
     )
   })
 })

@@ -1642,3 +1642,16 @@ vérité permanente dans Player.
 - Le cache des comparaisons doit inclure les contextes de protocole/version, métrique, sous-catégorie, saison et population lorsqu'ils influencent le résultat.
 - Toute écriture sur une Season `CLOSED` passe par `history.correctClosedSeason`.
 - Une Team `FIRST_TEAM` ne doit pas recevoir artificiellement un `categoryId` ou `seasonId`.
+
+## Addendum PR06 — fondation du domaine Tests
+
+- Le catalogue `TestDefinition` est global, mais toute lecture client exige un
+  contexte Team vérifié portant `tests.read`.
+- `TestBenchmark` est filtré et sécurisé par saison et sous-catégorie de la
+  Category de la Team active.
+- Le service Tests valide version, métrique, sous-catégorie, bornes et sens de
+  performance avant toute interprétation.
+- Les query keys privées incluent uid, rôle, Team et saison ; les benchmarks
+  ajoutent sous-catégorie et définition lorsqu'elles influencent le résultat.
+- PR06 est read-only côté UI. La saisie TestSession/TestResult est réservée à
+  PR07 et les comparaisons/normalisations avancées à PR08.

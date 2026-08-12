@@ -62,6 +62,14 @@ const protectedContext = (queryKey: QueryKey) => {
       seasonId: queryKey[5],
     }
   }
+  if (queryKey[0] === 'testDefinitions' || queryKey[0] === 'testBenchmarks') {
+    return {
+      uid: queryKey[1],
+      roleId: queryKey[2],
+      teamId: queryKey[3],
+      seasonId: queryKey[4],
+    }
+  }
   return undefined
 }
 

@@ -16,4 +16,29 @@ export const queryKeys = {
     count: (uid: string, roleId: string, teamId: string, seasonId: string) =>
       ['players', 'count', uid, roleId, teamId, seasonId] as const,
   },
+  tests: {
+    definitions: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+    ) => ['testDefinitions', uid, roleId, teamId, seasonId, 'active'] as const,
+    benchmarks: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      subCategoryId: string,
+      testDefinitionId?: string,
+    ) =>
+      [
+        'testBenchmarks',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        subCategoryId,
+        testDefinitionId ?? 'all',
+      ] as const,
+  },
 }

@@ -76,3 +76,50 @@ export type Assignment = {
   endDate?: Date
   status: 'ACTIVE' | 'INACTIVE'
 }
+
+export type TestMetricDefinition = {
+  metricKey: string
+  label: string
+  valueType: 'NUMBER'
+  unit: 'COUNT' | 'SECOND' | 'METER' | 'CENTIMETER' | 'KM_H'
+  direction:
+    'HIGHER_IS_BETTER' | 'LOWER_IS_BETTER' | 'TARGET_IS_BETTER' | 'NEUTRAL'
+  required: boolean
+  precision?: number
+  minValue?: number
+  maxValue?: number
+}
+
+export type TestAttemptPolicy = {
+  maxAttempts?: number
+  aggregation: 'BEST' | 'AVERAGE' | 'LAST' | 'MEDIAN'
+}
+
+export type TestDefinition = {
+  testDefinitionId: string
+  name: string
+  code: string
+  description?: string
+  domain: 'TECHNICAL' | 'PHYSICAL'
+  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
+  version: number
+  metrics: TestMetricDefinition[]
+  attemptPolicy?: TestAttemptPolicy
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type TestBenchmark = {
+  testBenchmarkId: string
+  testDefinitionId: string
+  testDefinitionVersion: number
+  metricKey: string
+  subCategoryId: string
+  seasonId?: string
+  benchmarkLevel: 'TARGET' | 'GOOD' | 'VERY_GOOD' | 'REFERENCE'
+  targetValue: number
+  label?: string
+  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
+  createdAt: Date
+  updatedAt: Date
+}
