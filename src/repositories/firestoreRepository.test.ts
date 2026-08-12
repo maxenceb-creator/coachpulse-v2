@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { withFirestoreDocumentId } from './firestoreRepository'
+import { withFirestoreDocumentId } from './firestoreDocumentIds'
 import { categorySchema, subCategorySchema } from '../validation/schemas'
 
 describe('withFirestoreDocumentId', () => {

@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import type { ZodType } from 'zod'
 import { db } from '../config/firebase'
+import { withFirestoreDocumentId } from './firestoreDocumentIds'
 
 type FirestoreFailure = Error & { code?: string }
 
@@ -34,26 +35,6 @@ const withDevFirestoreLog = async <T>(
     throw error
   }
 }
-const ids: Record<string, string> = {
-  users: 'userId',
-  roles: 'roleId',
-  userTeamAccess: 'userTeamAccessId',
-  teams: 'teamId',
-  seasons: 'seasonId',
-  categories: 'categoryId',
-  subCategories: 'subCategoryId',
-  players: 'playerId',
-  playerTeamAssignments: 'assignmentId',
-  testDefinitions: 'testDefinitionId',
-  testBenchmarks: 'testBenchmarkId',
-  testSessions: 'testSessionId',
-  testResults: 'testResultId',
-}
-export const withFirestoreDocumentId = (
-  path: string,
-  id: string,
-  data: Record<string, unknown>,
-) => ({ ...data, [ids[path] ?? 'id']: id })
 export async function one<T>(path: string, id: string, s: ZodType<T>) {
   return withDevFirestoreLog(`getDoc ${path}/${id}`, async () => {
     const x = await getDoc(doc(db, path, id))
