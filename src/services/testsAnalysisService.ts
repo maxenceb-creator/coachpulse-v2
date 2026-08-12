@@ -40,6 +40,31 @@ type Repository = TestsAnalyticsRepository & {
   assignmentsForTeam(teamId: string, seasonId: string): Promise<Assignment[]>
 }
 
+type AnalysisOperation = {
+  operation: string
+  collection: string
+}
+
+const runAnalysisOperation = async <T>(
+  details: AnalysisOperation,
+  run: () => Promise<T>,
+) => {
+  try {
+    return await run()
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      const failure = error as Error & { code?: string }
+      console.error('[TestAnalysis DEV] Erreur', {
+        ...details,
+        code: failure.code ?? 'UNKNOWN',
+        message: failure.message,
+        error,
+      })
+    }
+    throw error
+  }
+}
+
 const requireRead = (context: TestAnalysisContext) => {
   if (
     !hasPermission(context.accesses, {
@@ -65,9 +90,45 @@ export const createTestsAnalysisService = (repository: Repository) => ({
     context: TestAnalysisContext,
     filters: TestAnalysisFilters,
   ) {
+    const diagnostic = {
+      activeRoleId: context.activeRoleId,
+      teamId: context.teamId,
+      seasonId: context.seasonId,
+      testDefinitionId: filters.testDefinitionId,
+      playerId: filters.playerId,
+      securityContextReady: true,
+      queries: [
+        {
+          collection: 'testSessions',
+          where: [
+            ['teamId', '==', context.teamId],
+            ['seasonId', '==', context.seasonId],
+            ['testDefinitionId', '==', filters.testDefinitionId],
+            ['testDefinitionVersion', '==', filters.testDefinitionVersion],
+            ['status', '==', 'COMPLETED'],
+          ],
+          orderBy: ['date', 'desc'],
+          limit: 100,
+        },
+        {
+          collection: 'testResults',
+          where: [
+            ['teamId', '==', context.teamId],
+            ['seasonId', '==', context.seasonId],
+            ['testDefinitionId', '==', filters.testDefinitionId],
+            ['testDefinitionVersion', '==', filters.testDefinitionVersion],
+          ],
+          orderBy: null,
+          limit: 500,
+        },
+      ],
+    }
+    if (import.meta.env.DEV)
+      console.debug('[TestAnalysis DEV] Requête', diagnostic)
     requireRead(context)
-    const definition = await repository.getDefinitionById(
-      filters.testDefinitionId,
+    const definition = await runAnalysisOperation(
+      { operation: 'getDefinitionById', collection: 'testDefinitions' },
+      () => repository.getDefinitionById(filters.testDefinitionId),
     )
     if (!definition) throw new TestsDomainError('TEST_DEFINITION_NOT_FOUND')
     if (definition.version !== filters.testDefinitionVersion)
@@ -80,17 +141,31 @@ export const createTestsAnalysisService = (repository: Repository) => ({
     if (!metric) throw new TestsDomainError('METRIC_NOT_FOUND')
 
     const [allSessions, allResults] = await Promise.all([
-      repository.listCompletedSessionsByDefinition(
-        context.teamId,
-        context.seasonId,
-        definition.testDefinitionId,
-        definition.version,
+      runAnalysisOperation(
+        {
+          operation: 'listCompletedSessionsByDefinition',
+          collection: 'testSessions',
+        },
+        () =>
+          repository.listCompletedSessionsByDefinition(
+            context.teamId,
+            context.seasonId,
+            definition.testDefinitionId,
+            definition.version,
+          ),
       ),
-      repository.listResultsByDefinition(
-        context.teamId,
-        context.seasonId,
-        definition.testDefinitionId,
-        definition.version,
+      runAnalysisOperation(
+        {
+          operation: 'listResultsByDefinition',
+          collection: 'testResults',
+        },
+        () =>
+          repository.listResultsByDefinition(
+            context.teamId,
+            context.seasonId,
+            definition.testDefinitionId,
+            definition.version,
+          ),
       ),
     ])
     const sessions = allSessions.filter(
@@ -106,9 +181,12 @@ export const createTestsAnalysisService = (repository: Repository) => ({
         sessionsById.has(testSessionId) &&
         (!filters.playerId || filters.playerId === playerId),
     )
-    const assignments = await repository.assignmentsForTeam(
-      context.teamId,
-      context.seasonId,
+    const assignments = await runAnalysisOperation(
+      {
+        operation: 'assignmentsForTeam',
+        collection: 'playerTeamAssignments',
+      },
+      () => repository.assignmentsForTeam(context.teamId, context.seasonId),
     )
     const now = new Date()
     const scopedPlayerIds = new Set(
@@ -126,22 +204,35 @@ export const createTestsAnalysisService = (repository: Repository) => ({
           .filter((playerId) => scopedPlayerIds.has(playerId)),
       ),
     ]
-    const players = await repository.activePlayers(playerIds)
+    const players = await runAnalysisOperation(
+      { operation: 'activePlayers', collection: 'players' },
+      () => repository.activePlayers(playerIds),
+    )
     const categoryId = sessions[0]?.categoryId
     const category = categoryId
-      ? await repository.getCategory(categoryId)
+      ? await runAnalysisOperation(
+          { operation: 'getCategory', collection: 'categories' },
+          () => repository.getCategory(categoryId),
+        )
       : null
     const subCategories = category
-      ? await repository.getSubCategories(category.subCategoryIds)
+      ? await runAnalysisOperation(
+          { operation: 'getSubCategories', collection: 'subCategories' },
+          () => repository.getSubCategories(category.subCategoryIds),
+        )
       : []
     const benchmarksBySubCategory = new Map<string, TestBenchmark[]>()
     await Promise.all(
       subCategories.map(async ({ subCategoryId }) => {
-        const benchmarks = await repository.getBenchmarks({
-          subCategoryId,
-          seasonId: context.seasonId,
-          testDefinitionId: definition.testDefinitionId,
-        })
+        const benchmarks = await runAnalysisOperation(
+          { operation: 'getBenchmarks', collection: 'testBenchmarks' },
+          () =>
+            repository.getBenchmarks({
+              subCategoryId,
+              seasonId: context.seasonId,
+              testDefinitionId: definition.testDefinitionId,
+            }),
+        )
         benchmarksBySubCategory.set(
           subCategoryId,
           benchmarks.filter(
@@ -194,6 +285,15 @@ export const createTestsAnalysisService = (repository: Repository) => ({
             : undefined,
       }
     })
-    return { definition, metric, sessions, histories }
+    const analysis = { definition, metric, sessions, histories }
+    if (import.meta.env.DEV)
+      console.debug('[TestAnalysis DEV] Succès', {
+        ...diagnostic,
+        sessionCount: sessions.length,
+        resultCount: results.length,
+        playerCount: players.length,
+        benchmarkFound: histories.some(({ benchmark }) => !!benchmark),
+      })
+    return analysis
   },
 })

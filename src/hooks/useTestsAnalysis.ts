@@ -23,22 +23,43 @@ export const useTestsAnalysis = (
       input.metricKey,
       input.playerId,
     ),
-    queryFn: () =>
-      testsAnalysisService.getDefinitionAnalysis(
-        {
-          userId: context.uid,
-          activeRoleId: context.roleId,
-          teamId: context.teamId,
-          seasonId: context.seasonId,
-          accesses: context.accesses,
-        },
-        {
-          testDefinitionId: input.testDefinitionId,
-          testDefinitionVersion: input.version,
-          metricKey: input.metricKey,
-          playerId: input.playerId,
-        },
-      ),
+    queryFn: async () => {
+      try {
+        return await testsAnalysisService.getDefinitionAnalysis(
+          {
+            userId: context.uid,
+            activeRoleId: context.roleId,
+            teamId: context.teamId,
+            seasonId: context.seasonId,
+            accesses: context.accesses,
+          },
+          {
+            testDefinitionId: input.testDefinitionId,
+            testDefinitionVersion: input.version,
+            metricKey: input.metricKey,
+            playerId: input.playerId,
+          },
+        )
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          const failure = error as Error & { code?: string }
+          console.error('[TestAnalysis DEV] Erreur', {
+            operation: 'getDefinitionAnalysis',
+            collection: 'multiple',
+            activeRoleId: context.roleId,
+            teamId: context.teamId,
+            seasonId: context.seasonId,
+            testDefinitionId: input.testDefinitionId,
+            playerId: input.playerId,
+            securityContextReady: context.securityContextReady,
+            code: failure.code ?? 'UNKNOWN',
+            message: failure.message,
+            error,
+          })
+        }
+        throw error
+      }
+    },
     enabled:
       context.securityContextReady &&
       !!input.testDefinitionId &&

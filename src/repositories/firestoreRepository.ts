@@ -40,6 +40,8 @@ const ids: Record<string, string> = {
   userTeamAccess: 'userTeamAccessId',
   teams: 'teamId',
   seasons: 'seasonId',
+  categories: 'categoryId',
+  subCategories: 'subCategoryId',
   players: 'playerId',
   playerTeamAssignments: 'assignmentId',
   testDefinitions: 'testDefinitionId',
@@ -47,10 +49,17 @@ const ids: Record<string, string> = {
   testSessions: 'testSessionId',
   testResults: 'testResultId',
 }
+export const withFirestoreDocumentId = (
+  path: string,
+  id: string,
+  data: Record<string, unknown>,
+) => ({ ...data, [ids[path] ?? 'id']: id })
 export async function one<T>(path: string, id: string, s: ZodType<T>) {
   return withDevFirestoreLog(`getDoc ${path}/${id}`, async () => {
     const x = await getDoc(doc(db, path, id))
-    return x.exists() ? s.parse({ ...x.data(), [ids[path]]: x.id }) : null
+    return x.exists()
+      ? s.parse(withFirestoreDocumentId(path, x.id, x.data()))
+      : null
   })
 }
 export async function many<T>(
@@ -61,7 +70,7 @@ export async function many<T>(
   return withDevFirestoreLog(`getDocs ${path}`, async () => {
     const x = await getDocs(query(collection(db, path), ...constraints))
     return x.docs.map((d) =>
-      s.parse({ ...d.data(), [ids[path] ?? 'id']: d.id }),
+      s.parse(withFirestoreDocumentId(path, d.id, d.data())),
     )
   })
 }
