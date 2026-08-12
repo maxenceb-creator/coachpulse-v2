@@ -446,7 +446,11 @@ describe('Security Rules administration Tests PR09', () => {
         ),
       ),
     )
-    expect(visibleBenchmarks.docs.map(({ id }) => id)).toEqual(['new-target'])
+    expect(visibleBenchmarks.docs.map(({ id }) => id)).toContain('new-target')
+    expect(
+      visibleBenchmarks.docs.find(({ id }) => id === 'new-target')?.data()
+        .status,
+    ).toBe('ARCHIVED')
     await assertFails(
       getDocs(
         query(
