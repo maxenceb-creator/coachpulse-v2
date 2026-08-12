@@ -3,7 +3,8 @@ export const queryKeys = {
   roles: (uid: string, roleIds: string[]) =>
     ['roles', uid, ...[...roleIds].sort()] as const,
   teamAccess: (uid: string) => ['teamAccess', uid] as const,
-  teams: (uid: string, roleId: string) => ['teams', uid, roleId] as const,
+  teams: (uid: string, roleId: string, teamIds: string[] = []) =>
+    ['teams', uid, roleId, ...[...teamIds].sort()] as const,
   season: ['season', 'active'] as const,
   assignments: (
     uid: string,

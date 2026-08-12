@@ -9,7 +9,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthProvider'
 import { repositories } from '../repositories/appRepositories'
-import { canAccessTeam } from '../services/permissionsService'
+import { resolveAccessibleTeamAccesses } from '../services/permissionsService'
 import {
   isSecurityContextReady,
   selectActiveId,
@@ -73,26 +73,49 @@ export function AppContext({ children }: { children: ReactNode }) {
       ),
     )
   }, [roles, p, activeRoleId])
-  const teamIds = useMemo(
-    () => [
-      ...new Set(
-        accesses
-          .filter(
-            (a) =>
-              activeRoleId &&
-              canAccessTeam(accesses, uid, activeRoleId, a.teamId),
-          )
-          .map((a) => a.teamId),
-      ),
-    ],
+  const accessResolution = useMemo(
+    () =>
+      activeRoleId
+        ? resolveAccessibleTeamAccesses(accesses, uid, activeRoleId)
+        : { userAccesses: [], activeAccesses: [], roleAccesses: [] },
     [accesses, activeRoleId, uid],
   )
+  const teamIds = useMemo(
+    () => [...new Set(accessResolution.roleAccesses.map((a) => a.teamId))],
+    [accessResolution.roleAccesses],
+  )
   const tq = useQuery({
-    queryKey: queryKeys.teams(uid, activeRoleId ?? ''),
+    queryKey: queryKeys.teams(uid, activeRoleId ?? '', teamIds),
     queryFn: () => repositories.teams(teamIds),
     enabled: !!activeRoleId,
   })
   const teams = useMemo(() => tq.data ?? [], [tq.data])
+  useEffect(() => {
+    if (!import.meta.env.DEV || !activeRoleId || !aq.data) return
+
+    console.debug('[Team access DEV] Résolution des équipes accessibles', {
+      activeRoleId,
+      retrievedAccesses: accessResolution.userAccesses.map((access) => ({
+        teamId: access.teamId,
+        status: access.status,
+        startDate: access.startDate?.toISOString(),
+        endDate: access.endDate?.toISOString(),
+        availableRoleIds: Object.keys(access.rolePermissions),
+      })),
+      activeAfterTemporalFilter: accessResolution.activeAccesses.map(
+        ({ teamId }) => teamId,
+      ),
+      activeAfterRoleFilter: accessResolution.roleAccesses.map(
+        ({ teamId }) => teamId,
+      ),
+      requestedTeamIds: teamIds,
+      finalTeams: teams.map(({ teamId, name, status }) => ({
+        teamId,
+        name,
+        status,
+      })),
+    })
+  }, [activeRoleId, aq.data, accessResolution, teamIds, teams])
   useEffect(() => {
     setActiveTeamId(
       selectActiveId(

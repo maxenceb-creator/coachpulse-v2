@@ -174,4 +174,9 @@ describe('query keys privées', () => {
       queryKeys.players.count('user-a', 'coach', 'u13', '2027'),
     ).not.toEqual(base)
   })
+  it('isole la liste Teams quand les TeamAccess effectifs changent', () => {
+    expect(queryKeys.teams('user-a', 'coach', ['u13'])).not.toEqual(
+      queryKeys.teams('user-a', 'coach', ['u13', 'u14']),
+    )
+  })
 })

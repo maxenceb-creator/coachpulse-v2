@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { playerSchema, teamSchema } from './schemas'
+import { accessSchema, playerSchema, teamSchema } from './schemas'
 const timestamp = new Date('2026-08-01T00:00:00.000Z')
 describe('validation Firestore', () => {
   it('refuse teamId dans Player', () =>
@@ -50,6 +50,35 @@ describe('validation Firestore', () => {
         teamId: 't',
         name: 'Première',
         teamType: 'FIRST_TEAM',
+        status: 'ACTIVE',
+      }).success,
+    ).toBe(true))
+  it('accepte le TeamAccess U14F avec les permissions des trois rôles DEV', () =>
+    expect(
+      accessSchema.safeParse({
+        userTeamAccessId: 'user-dev_team-dev-u14f',
+        userId: 'user-dev',
+        teamId: 'team-dev-u14f',
+        status: 'ACTIVE',
+        startDate: new Date('2026-08-01T00:00:00.000Z'),
+        rolePermissions: Object.fromEntries(
+          ['role-admin', 'role-coach-principal', 'role-analyste-video'].map(
+            (roleId) => [
+              roleId,
+              { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
+            ],
+          ),
+        ),
+      }).success,
+    ).toBe(true))
+  it('accepte la Team U14F ACTIVE', () =>
+    expect(
+      teamSchema.safeParse({
+        teamId: 'team-dev-u14f',
+        name: 'U14F DEV',
+        teamType: 'DEVELOPMENT',
+        seasonId: 'season-2026-2027',
+        categoryId: 'category-u14f-2026',
         status: 'ACTIVE',
       }).success,
     ).toBe(true))
