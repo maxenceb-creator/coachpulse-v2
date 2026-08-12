@@ -222,16 +222,33 @@ Les tests relatifs aux deux pieds utilisent `STRONG_FOOT` et `WEAK_FOOT` plutôt
 Une correction future de `preferredFoot` ne doit pas rendre les anciens résultats ambigus ; le contexte nécessaire doit rester reconstructible.
 
 ## BR-068 — TestSession
-Chaque campagne de test référence un protocole, une saison, une catégorie et une date.
+Chaque campagne de test référence une version de protocole, une Team, une
+saison, une catégorie et une date. Ce contexte est figé à la création.
 
 ## BR-069 — Une Category par TestSession
 Deux catégories testées simultanément produisent deux TestSession distinctes.
 
 ## BR-070 — Population TestSession
-Population dérivée de la catégorie et des affectations, avec invitations ponctuelles autorisées.
+En PR07, la population est dérivée des affectations de la Team effectives à la
+date sportive de la TestSession et du périmètre du rôle actif. Les invitations
+ponctuelles restent une extension future et ne permettent jamais l'ajout libre
+d'un playerId hors scope.
 
 ## BR-071 — Unicité TestResult
 `testSessionId + playerId` identifie le résultat d'une joueuse.
+
+## BR-071A — Cycle de saisie PR07
+Une TestSession commence `DRAFT`, puis devient `COMPLETED`. Une session
+`COMPLETED` n'est plus modifiable avec `tests.write`; une correction future
+utilisera une permission dédiée. La finalisation valide chaque TestResult
+réellement présent sans imposer un résultat aux joueuses non testées.
+
+## BR-071B — Suppression contrôlée PR07
+Une TestSession `DRAFT` ou `COMPLETED` peut être supprimée par un utilisateur
+disposant de `tests.write` dans la Team et la saison actives, après confirmation
+explicite. Une confirmation renforcée est exigée pour `COMPLETED`. La suppression
+physique retire atomiquement la TestSession et tous ses TestResults. Une permission
+de suppression dédiée pourra remplacer `tests.write` lors d'une évolution future.
 
 ## BR-072 — Plusieurs tentatives
 Les protocoles peuvent conserver plusieurs tentatives brutes.

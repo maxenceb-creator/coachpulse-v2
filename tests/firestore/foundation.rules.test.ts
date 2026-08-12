@@ -6,17 +6,22 @@ import {
 } from '@firebase/rules-unit-testing'
 import {
   collection,
+  deleteDoc,
   doc,
   documentId,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
   where,
 } from 'firebase/firestore'
 import { readFile } from 'node:fs/promises'
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 const projectId = 'demo-coachpulse-v2'
 const seasonId = 'season-active'
@@ -47,11 +52,12 @@ beforeEach(async () => {
     await Promise.all([
       write('roles/coach', { isActive: true }),
       write('roles/analyst', { isActive: true }),
+      write('roles/reader', { isActive: true }),
       write('roles/admin', { isActive: true }),
       write('roles/inactive-role', { isActive: false }),
       write('users/user-a', {
         status: 'ACTIVE',
-        roleIds: ['coach', 'analyst', 'inactive-role'],
+        roleIds: ['coach', 'analyst', 'reader', 'inactive-role'],
         securityContext: securityContext('coach'),
       }),
       write('users/user-disabled', {
@@ -80,10 +86,11 @@ beforeEach(async () => {
         status: 'ACTIVE',
         rolePermissions: {
           coach: {
-            permissions: ['players.read', 'tests.read'],
+            permissions: ['players.read', 'tests.read', 'tests.write'],
             medicalAccessLevel: 'NONE',
           },
           analyst: { permissions: [], medicalAccessLevel: 'NONE' },
+          reader: { permissions: ['tests.read'], medicalAccessLevel: 'NONE' },
           'inactive-role': {
             permissions: ['players.read'],
             medicalAccessLevel: 'NONE',
@@ -162,6 +169,31 @@ beforeEach(async () => {
         status: 'ACTIVE',
         version: 1,
       }),
+      write('testSessions/session-existing', {
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        teamId: 'team-a',
+        seasonId,
+        categoryId: 'category-a',
+        date: new Date('2026-08-12T00:00:00.000Z'),
+        status: 'DRAFT',
+        createdBy: 'user-a',
+        createdAt: new Date('2026-08-12T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T00:00:00.000Z'),
+      }),
+      write('testResults/session-existing_player-a', {
+        testSessionId: 'session-existing',
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        playerId: 'player-a',
+        teamId: 'team-a',
+        seasonId,
+        values: { STRONG_FOOT: 0 },
+        contextSnapshot: { preferredFoot: 'RIGHT' },
+        createdBy: 'user-a',
+        createdAt: new Date('2026-08-12T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T00:00:00.000Z'),
+      }),
       write('testBenchmarks/benchmark-a', {
         testDefinitionId: 'juggling-v1',
         testDefinitionVersion: 1,
@@ -185,6 +217,7 @@ beforeEach(async () => {
       }),
       write('players/player-a', { status: 'ACTIVE' }),
       write('players/player-b', { status: 'ACTIVE' }),
+      write('players/player-c', { status: 'ACTIVE' }),
       write('playerTeamAssignments/assignment-a', {
         playerId: 'player-a',
         teamId: 'team-a',
@@ -208,6 +241,14 @@ beforeEach(async () => {
       write(`playerAccessScopes/player-b_team-b_${seasonId}`, {
         playerId: 'player-b',
         teamId: 'team-b',
+        seasonId,
+        status: 'ACTIVE',
+        startDate: new Date('2026-08-01T00:00:00.000Z'),
+        source: 'PLAYER_TEAM_ASSIGNMENT',
+      }),
+      write(`playerAccessScopes/player-c_team-a_${seasonId}`, {
+        playerId: 'player-c',
+        teamId: 'team-a',
         seasonId,
         status: 'ACTIVE',
         startDate: new Date('2026-08-01T00:00:00.000Z'),
@@ -289,6 +330,285 @@ describe('Security Rules du domaine Tests PR06', () => {
         status: 'ACTIVE',
       }),
     )
+  })
+})
+
+describe('Security Rules TestSession/TestResult PR07', () => {
+  const sessionData = (overrides: Record<string, unknown> = {}) => ({
+    testDefinitionId: 'juggling-v1',
+    testDefinitionVersion: 1,
+    teamId: 'team-a',
+    seasonId,
+    categoryId: 'category-a',
+    date: new Date('2026-08-12T00:00:00.000Z'),
+    status: 'DRAFT',
+    createdBy: 'user-a',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  })
+
+  it('refuse les lectures non authentifiées, désactivées et sans tests.read', async () => {
+    await assertFails(
+      getDoc(
+        doc(
+          testEnv.unauthenticatedContext().firestore(),
+          'testSessions/session-existing',
+        ),
+      ),
+    )
+    await assertFails(
+      getDoc(
+        doc(
+          testEnv.authenticatedContext('user-disabled').firestore(),
+          'testSessions/session-existing',
+        ),
+      ),
+    )
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('analyst'),
+      }),
+    )
+    await assertFails(getDoc(doc(db, 'testSessions/session-existing')))
+  })
+
+  it('distingue tests.read de tests.write', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('reader'),
+      }),
+    )
+    await assertSucceeds(getDoc(doc(db, 'testSessions/session-existing')))
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testSessions'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testResults'),
+          where('testSessionId', '==', 'session-existing'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
+    await assertFails(
+      setDoc(doc(db, 'testSessions/reader-session'), sessionData()),
+    )
+  })
+
+  it('autorise la query réelle sur une collection testSessions vide', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const snapshot = await getDocs(
+        collection(context.firestore(), 'testSessions'),
+      )
+      await Promise.all(snapshot.docs.map((item) => deleteDoc(item.ref)))
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const snapshot = await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testSessions'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          orderBy('date', 'desc'),
+          limit(100),
+        ),
+      ),
+    )
+    expect(snapshot.empty).toBe(true)
+    expect(snapshot.docs).toEqual([])
+  })
+
+  it('autorise une session du contexte actif et refuse Team, saison ou version incohérente', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(setDoc(doc(db, 'testSessions/valid'), sessionData()))
+    await assertFails(
+      setDoc(
+        doc(db, 'testSessions/wrong-team'),
+        sessionData({ teamId: 'team-b', categoryId: 'category-b' }),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(db, 'testSessions/wrong-season'),
+        sessionData({ seasonId: 'other-season' }),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(db, 'testSessions/wrong-version'),
+        sessionData({ testDefinitionVersion: 2 }),
+      ),
+    )
+  })
+
+  it('autorise un résultat canonique, y compris zéro, et refuse player hors scope', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const result = (playerId: string) => ({
+      testSessionId: 'session-existing',
+      testDefinitionId: 'juggling-v1',
+      testDefinitionVersion: 1,
+      playerId,
+      teamId: 'team-a',
+      seasonId,
+      values: { STRONG_FOOT: 0 },
+      contextSnapshot: { preferredFoot: 'RIGHT' },
+      createdBy: 'user-a',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'testResults/session-existing_player-c'),
+        result('player-c'),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(db, 'testResults/session-existing_player-b'),
+        result('player-b'),
+      ),
+    )
+    await assertFails(
+      setDoc(doc(db, 'testResults/duplicate-id'), result('player-a')),
+    )
+  })
+
+  it('finalise une session DRAFT et interdit ensuite les corrections ordinaires', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'testSessions/session-existing'), {
+        status: 'COMPLETED',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(db, 'testResults/session-existing_player-a'), {
+        values: { STRONG_FOOT: 12 },
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('autorise la suppression atomique DRAFT avec ses résultats', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'testResults/session-existing_player-a'))
+    batch.delete(doc(db, 'testSessions/session-existing'))
+    await assertSucceeds(batch.commit())
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      expect(
+        (await getDoc(doc(admin, 'testSessions/session-existing'))).exists(),
+      ).toBe(false)
+      expect(
+        (
+          await getDocs(
+            query(
+              collection(admin, 'testResults'),
+              where('testSessionId', '==', 'session-existing'),
+            ),
+          )
+        ).empty,
+      ).toBe(true)
+    })
+  })
+
+  it('autorise la suppression d’une session DRAFT vide', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'testSessions/empty-draft'),
+        sessionData(),
+      )
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'testSessions/empty-draft')))
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      expect(
+        (
+          await getDoc(doc(context.firestore(), 'testSessions/empty-draft'))
+        ).exists(),
+      ).toBe(false)
+    })
+  })
+
+  it('autorise la suppression confirmée côté UI d’une session COMPLETED', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(
+        doc(context.firestore(), 'testSessions/session-existing'),
+        { status: 'COMPLETED' },
+      )
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'testResults/session-existing_player-a'))
+    batch.delete(doc(db, 'testSessions/session-existing'))
+    await assertSucceeds(batch.commit())
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      expect(
+        (await getDoc(doc(admin, 'testSessions/session-existing'))).exists(),
+      ).toBe(false)
+      expect(
+        (
+          await getDoc(doc(admin, 'testResults/session-existing_player-a'))
+        ).exists(),
+      ).toBe(false)
+    })
+  })
+
+  it('refuse delete sans tests.write, autre Team ou autre saison', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('reader'),
+      }),
+    )
+    await assertFails(deleteDoc(doc(db, 'testSessions/session-existing')))
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      await setDoc(
+        doc(admin, 'testSessions/other-team'),
+        sessionData({ teamId: 'team-b', categoryId: 'category-b' }),
+      )
+      await setDoc(
+        doc(admin, 'testSessions/other-season'),
+        sessionData({ seasonId: 'other-season' }),
+      )
+    })
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('coach'),
+      }),
+    )
+    await assertFails(deleteDoc(doc(db, 'testSessions/other-team')))
+    await assertFails(deleteDoc(doc(db, 'testSessions/other-season')))
+  })
+
+  it('refuse la suppression d’un TestResult hors scope', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'testResults/out-of-scope'), {
+        testSessionId: 'session-existing',
+        testDefinitionId: 'juggling-v1',
+        testDefinitionVersion: 1,
+        playerId: 'player-b',
+        teamId: 'team-b',
+        seasonId,
+      })
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertFails(deleteDoc(doc(db, 'testResults/out-of-scope')))
   })
 })
 

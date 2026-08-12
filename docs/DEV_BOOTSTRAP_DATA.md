@@ -53,8 +53,26 @@ versionnées (Jongles, Sprint 20 m, Cooper) et six TestBenchmark TARGET U13/U14.
 Après démarrage de l'application, le compte permet de tester le Dashboard, le
 changement de rôle, les Teams accessibles, la saison active, le nombre de
 joueuses par Team et la page `/tests`. Le rôle Coach principal possède un
-TeamAccess sur U13F et U14F avec `tests.read` ; l'équipe première reste réservée
+TeamAccess sur U13F et U14F avec `tests.read` et `tests.write` ; l'équipe première reste réservée
 au rôle Admin dans ce dataset.
+
+## Index Tests après déploiement
+
+Le succès de `firebase deploy --only firestore:indexes` confirme la création
+ou la mise à jour des index, mais pas nécessairement la fin immédiate de leur
+construction. La liste des TestSession utilise l'index composite
+`teamId ASC + seasonId ASC + date DESC`.
+
+Avant le test manuel de `/tests`, vérifier dans la sortie debug que cet index
+est en état `READY` :
+
+```bash
+firebase firestore:indexes --project coachpulse-v2-dev --debug
+```
+
+Un index encore en construction produit une erreur Firestore
+`failed-precondition`. Cette erreur ne doit pas être convertie en liste vide ;
+une collection réellement vide avec un index READY retourne normalement `[]`.
 
 ## Relancer sans risque
 

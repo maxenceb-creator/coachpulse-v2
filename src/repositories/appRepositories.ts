@@ -64,4 +64,21 @@ export const repositories = {
       )
     ).flat().length
   },
+  async activePlayers(playerIds: string[]) {
+    if (!playerIds.length) return []
+    const groups = Array.from(
+      { length: Math.ceil(playerIds.length / 30) },
+      (_, i) => playerIds.slice(i * 30, i * 30 + 30),
+    )
+    return (
+      await Promise.all(
+        groups.map((group) =>
+          many('players', playerSchema, [
+            where(documentId(), 'in', group),
+            where('status', '==', 'ACTIVE'),
+          ]),
+        ),
+      )
+    ).flat()
+  },
 }

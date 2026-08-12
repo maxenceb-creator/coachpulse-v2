@@ -90,6 +90,117 @@ service cloud.firestore {
         && (!('endDate' in scope.data) || scope.data.endDate >= request.time);
     }
 
+    function playerScopeAt(playerId, teamId, seasonId, effectiveAt) {
+      let scope = get(
+        /databases/$(database)/documents/playerAccessScopes/$(playerId + '_' + teamId + '_' + seasonId)
+      );
+      return scope.data.playerId == playerId
+        && scope.data.teamId == teamId
+        && scope.data.seasonId == seasonId
+        && scope.data.source == 'PLAYER_TEAM_ASSIGNMENT'
+        && scope.data.status == 'ACTIVE'
+        && (!('startDate' in scope.data) || scope.data.startDate <= effectiveAt)
+        && (!('endDate' in scope.data) || scope.data.endDate >= effectiveAt);
+    }
+
+    function validTestTeamContext(data, permission) {
+      let team = get(/databases/$(database)/documents/teams/$(data.teamId));
+      let season = get(/databases/$(database)/documents/seasons/$(data.seasonId));
+      return canInSecurityContext(data.teamId, data.seasonId, permission)
+        && team.data.status == 'ACTIVE'
+        && team.data.teamType == 'DEVELOPMENT'
+        && team.data.seasonId == data.seasonId
+        && team.data.categoryId == data.categoryId
+        && season.data.status == 'ACTIVE';
+    }
+
+    function validTestReadContext(data) {
+      let team = get(/databases/$(database)/documents/teams/$(data.teamId));
+      return canInSecurityContext(data.teamId, data.seasonId, 'tests.read')
+        && team.data.status == 'ACTIVE'
+        && team.data.teamType == 'DEVELOPMENT'
+        && team.data.seasonId == data.seasonId;
+    }
+
+    function validTestSessionCreate() {
+      let data = request.resource.data;
+      let definition = get(
+        /databases/$(database)/documents/testDefinitions/$(data.testDefinitionId)
+      );
+      return data.keys().hasOnly([
+          'testDefinitionId', 'testDefinitionVersion', 'teamId', 'seasonId',
+          'categoryId', 'date', 'status', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.status == 'DRAFT'
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time
+        && data.updatedAt == request.time
+        && data.testDefinitionVersion == definition.data.version
+        && definition.data.status == 'ACTIVE'
+        && validTestTeamContext(data, 'tests.write');
+    }
+
+    function testSessionAfter(sessionId) {
+      return getAfter(/databases/$(database)/documents/testSessions/$(sessionId));
+    }
+
+    function validTestResult(resultId, creating) {
+      let data = request.resource.data;
+      let session = testSessionAfter(data.testSessionId);
+      let beforeSession = get(
+        /databases/$(database)/documents/testSessions/$(data.testSessionId)
+      );
+      return resultId == data.testSessionId + '_' + data.playerId
+        && data.keys().hasOnly([
+          'testSessionId', 'testDefinitionId', 'testDefinitionVersion',
+          'playerId', 'teamId', 'seasonId', 'values', 'contextSnapshot',
+          'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.values is map
+        && data.values.size() > 0
+        && data.testDefinitionId == session.data.testDefinitionId
+        && data.testDefinitionVersion == session.data.testDefinitionVersion
+        && data.teamId == session.data.teamId
+        && data.seasonId == session.data.seasonId
+        && beforeSession.data.status == 'DRAFT'
+        && session.data.status in ['DRAFT', 'COMPLETED']
+        && data.createdBy == request.auth.uid
+        && (
+          (creating && data.createdAt <= request.time)
+          || (!creating
+            && data.createdAt == resource.data.createdAt
+            && data.createdBy == resource.data.createdBy)
+        )
+        && data.updatedAt == request.time
+        && validTestTeamContext(session.data, 'tests.write')
+        && playerScopeAt(
+          data.playerId,
+          session.data.teamId,
+          session.data.seasonId,
+          session.data.date
+        );
+    }
+
+    function canReadTestResult(data) {
+      let session = get(
+        /databases/$(database)/documents/testSessions/$(data.testSessionId)
+      );
+      return session.data.teamId == data.teamId
+        && session.data.seasonId == data.seasonId
+        && validTestReadContext(session.data);
+    }
+
+    function canDeleteTestResult(data) {
+      let session = get(
+        /databases/$(database)/documents/testSessions/$(data.testSessionId)
+      );
+      return data.teamId == session.data.teamId
+        && data.seasonId == session.data.seasonId
+        && data.testDefinitionId == session.data.testDefinitionId
+        && data.testDefinitionVersion == session.data.testDefinitionVersion
+        && validTestTeamContext(session.data, 'tests.write');
+    }
+
     match /users/{userId} {
       allow read: if activeUser() && request.auth.uid == userId;
       allow update: if activeUser()
@@ -147,6 +258,24 @@ service cloud.firestore {
       allow read: if canInActiveSecurityContext('tests.read')
         && benchmarkInActiveCategory(resource.data);
       allow write: if false;
+    }
+
+    match /testSessions/{testSessionId} {
+      allow read: if validTestReadContext(resource.data);
+      allow create: if validTestSessionCreate();
+      allow update: if validTestTeamContext(resource.data, 'tests.write')
+        && resource.data.status == 'DRAFT'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status == 'COMPLETED'
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if validTestTeamContext(resource.data, 'tests.write');
+    }
+
+    match /testResults/{testResultId} {
+      allow read: if canReadTestResult(resource.data);
+      allow create: if validTestResult(testResultId, true);
+      allow update: if validTestResult(testResultId, false);
+      allow delete: if canDeleteTestResult(resource.data);
     }
 
     match /{document=**} {

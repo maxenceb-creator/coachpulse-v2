@@ -123,3 +123,32 @@ export type TestBenchmark = {
   createdAt: Date
   updatedAt: Date
 }
+
+export type TestSession = {
+  testSessionId: string
+  testDefinitionId: string
+  testDefinitionVersion: number
+  teamId: string
+  seasonId: string
+  categoryId: string
+  date: Date
+  status: 'DRAFT' | 'COMPLETED'
+  createdBy: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type TestResult = {
+  testResultId: string
+  testSessionId: string
+  testDefinitionId: string
+  testDefinitionVersion: number
+  playerId: string
+  teamId: string
+  seasonId: string
+  values: Record<string, number>
+  contextSnapshot: { preferredFoot: Player['preferredFoot'] }
+  createdBy: string
+  createdAt: Date
+  updatedAt: Date
+}

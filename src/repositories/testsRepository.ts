@@ -1,10 +1,29 @@
-import { limit, where } from 'firebase/firestore'
-import type { TestBenchmark, TestDefinition } from '../types/domain'
+import { limit, orderBy, serverTimestamp, where } from 'firebase/firestore'
+import type {
+  TestBenchmark,
+  TestDefinition,
+  TestResult,
+  TestSession,
+} from '../types/domain'
 import {
   testBenchmarkSchema,
   testDefinitionSchema,
+  testResultSchema,
+  testSessionSchema,
 } from '../validation/schemas'
-import { many, one } from './firestoreRepository'
+import {
+  commitWrites,
+  deleteMany,
+  many,
+  one,
+  set,
+  setMany,
+  update,
+} from './firestoreRepository'
+import {
+  toTestResultDocument,
+  toTestSessionDocument,
+} from './testDocumentMappers'
 
 export type TestBenchmarksQuery = {
   subCategoryId: string
@@ -16,6 +35,26 @@ export interface TestsRepository {
   getActiveDefinitions(): Promise<TestDefinition[]>
   getDefinitionById(testDefinitionId: string): Promise<TestDefinition | null>
   getBenchmarks(query: TestBenchmarksQuery): Promise<TestBenchmark[]>
+  createSession(session: TestSession): Promise<void>
+  updateSession(id: string, data: Partial<TestSession>): Promise<void>
+  getSessionById(id: string): Promise<TestSession | null>
+  listSessions(teamId: string, seasonId: string): Promise<TestSession[]>
+  getResultsBySession(
+    testSessionId: string,
+    teamId: string,
+    seasonId: string,
+  ): Promise<TestResult[]>
+  getResultsForDeletion(
+    testSessionId: string,
+    teamId: string,
+    seasonId: string,
+  ): Promise<TestResult[]>
+  saveResults(results: TestResult[]): Promise<void>
+  completeSession(session: TestSession, results: TestResult[]): Promise<void>
+  deleteSessionWithResults(
+    session: TestSession,
+    results: TestResult[],
+  ): Promise<void>
 }
 
 export const testsRepository: TestsRepository = {
@@ -35,5 +74,74 @@ export const testsRepository: TestsRepository = {
         ? [where('testDefinitionId', '==', testDefinitionId)]
         : []),
       limit(100),
+    ]),
+  createSession: (value) => {
+    const { testSessionId } = value
+    const session = toTestSessionDocument(value)
+    return set('testSessions', testSessionId, {
+      ...session,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+  },
+  updateSession: (id, data) => update('testSessions', id, data),
+  getSessionById: (id) => one('testSessions', id, testSessionSchema),
+  listSessions: (teamId, seasonId) =>
+    many('testSessions', testSessionSchema, [
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      orderBy('date', 'desc'),
+      limit(100),
+    ]),
+  getResultsBySession: (testSessionId, teamId, seasonId) =>
+    many('testResults', testResultSchema, [
+      where('testSessionId', '==', testSessionId),
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      limit(100),
+    ]),
+  getResultsForDeletion: (testSessionId, teamId, seasonId) =>
+    many('testResults', testResultSchema, [
+      where('testSessionId', '==', testSessionId),
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      limit(500),
+    ]),
+  saveResults: (results) =>
+    setMany(
+      results.map((value) => ({
+        path: 'testResults',
+        id: value.testResultId,
+        data: {
+          ...toTestResultDocument(value),
+          updatedAt: serverTimestamp(),
+        },
+      })),
+    ),
+  completeSession: (session, results) =>
+    commitWrites(
+      results.map((value) => ({
+        path: 'testResults',
+        id: value.testResultId,
+        data: {
+          ...toTestResultDocument(value),
+          updatedAt: serverTimestamp(),
+        },
+      })),
+      [
+        {
+          path: 'testSessions',
+          id: session.testSessionId,
+          data: { status: 'COMPLETED', updatedAt: serverTimestamp() },
+        },
+      ],
+    ),
+  deleteSessionWithResults: (session, results) =>
+    deleteMany([
+      ...results.map((result) => ({
+        path: 'testResults',
+        id: result.testResultId,
+      })),
+      { path: 'testSessions', id: session.testSessionId },
     ]),
 }

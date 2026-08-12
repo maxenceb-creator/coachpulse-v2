@@ -23,6 +23,23 @@ export const queryKeys = {
       teamId: string,
       seasonId: string,
     ) => ['testDefinitions', uid, roleId, teamId, seasonId, 'active'] as const,
+    definition: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      testDefinitionId: string,
+      version: number,
+    ) =>
+      [
+        'testDefinition',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        testDefinitionId,
+        version,
+      ] as const,
     benchmarks: (
       uid: string,
       roleId: string,
@@ -40,5 +57,21 @@ export const queryKeys = {
         subCategoryId,
         testDefinitionId ?? 'all',
       ] as const,
+    sessions: (uid: string, roleId: string, teamId: string, seasonId: string) =>
+      ['testSessions', uid, roleId, teamId, seasonId] as const,
+    session: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      testSessionId: string,
+    ) => ['testSession', uid, roleId, teamId, seasonId, testSessionId] as const,
+    results: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      testSessionId: string,
+    ) => ['testResults', uid, roleId, teamId, seasonId, testSessionId] as const,
   },
 }

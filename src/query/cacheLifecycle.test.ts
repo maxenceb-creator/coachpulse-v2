@@ -213,6 +213,16 @@ describe('query keys privées', () => {
   it('isole Tests par contexte et benchmarks par sous-catégorie', () => {
     const base = queryKeys.tests.definitions('user-a', 'coach', 'u13', '2026')
     expect(
+      queryKeys.tests.definition(
+        'user-a',
+        'coach',
+        'u13',
+        '2026',
+        'juggling',
+        1,
+      ),
+    ).not.toEqual(base)
+    expect(
       queryKeys.tests.definitions('user-a', 'coach', 'u14', '2026'),
     ).not.toEqual(base)
     expect(

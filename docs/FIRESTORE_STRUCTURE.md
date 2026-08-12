@@ -157,14 +157,30 @@ Category doit contenir `subCategoryId` et la saison doit correspondre. Les
 écritures client restent refusées ; les seeds DEV utilisent Firebase Admin.
 
 ## testSessions
-`testSessions/{testSessionId}` contient testDefinitionId, seasonId, categoryId, date et status.
+`testSessions/{testSessionId}` contient testDefinitionId,
+testDefinitionVersion, teamId, seasonId, categoryId, date, status
+(`DRAFT | COMPLETED`) et les champs d'audit technique.
 
-Règle : 1 TestSession = 1 Category. L'accès suit le même principe Team → Category que Session.
+Règle : 1 TestSession = 1 Category. La Team, la Season et la Category sont
+figées. L'accès exige le contexte Team/Saison actif et `tests.read` ou
+`tests.write` selon l'opération.
 
 ## testResults
-`testResults/{testSessionId}_{playerId}` contient valeurs, tentatives, status et contextSnapshot?.
+`testResults/{testSessionId}_{playerId}` contient le contexte historique
+minimal, `values` générique et `contextSnapshot.preferredFoot`. Aucun document
+vide n'est créé pour une joueuse non testée.
 
 Le contextSnapshot peut figer preferredFoot pour préserver l'interprétation STRONG_FOOT / WEAK_FOOT.
+
+La sauvegarde explicite d'un brouillon écrit en batch les résultats présents.
+La finalisation écrit les résultats présents et passe la session à COMPLETED
+dans un même batch. Les saisies clavier locales ne déclenchent pas une écriture
+Firestore à chaque frappe.
+
+La suppression confirmée d'une TestSession supprime ses TestResults puis la
+TestSession dans un même batch atomique. PR07 refuse l'opération au-delà de 499
+résultats liés afin de respecter la limite de 500 opérations du batch sans
+introduire de suppression partielle.
 
 ## matches
 `matches/{matchId}` contient seasonId, teamId, date, adversaire, format, configuration des périodes, orientation, status et possession initiale.

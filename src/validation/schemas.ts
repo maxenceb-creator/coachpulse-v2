@@ -156,3 +156,38 @@ export const testBenchmarkSchema = z
     updatedAt: date,
   })
   .strict()
+
+export const testSessionSchema = z
+  .object({
+    testSessionId: z.string().min(1),
+    testDefinitionId: z.string().min(1),
+    testDefinitionVersion: z.number().int().positive(),
+    teamId: z.string().min(1),
+    seasonId: z.string().min(1),
+    categoryId: z.string().min(1),
+    date,
+    status: z.enum(['DRAFT', 'COMPLETED']),
+    createdBy: z.string().min(1),
+    createdAt: date,
+    updatedAt: date,
+  })
+  .strict()
+
+export const testResultSchema = z
+  .object({
+    testResultId: z.string().min(1),
+    testSessionId: z.string().min(1),
+    testDefinitionId: z.string().min(1),
+    testDefinitionVersion: z.number().int().positive(),
+    playerId: z.string().min(1),
+    teamId: z.string().min(1),
+    seasonId: z.string().min(1),
+    values: z.record(metricKeySchema, z.number().finite()),
+    contextSnapshot: z
+      .object({ preferredFoot: z.enum(['LEFT', 'RIGHT', 'UNKNOWN']) })
+      .strict(),
+    createdBy: z.string().min(1),
+    createdAt: date,
+    updatedAt: date,
+  })
+  .strict()

@@ -86,6 +86,12 @@ describe('DEV bootstrap data', () => {
       .map(({ teamId }) => teamId)
 
     expect(coachTeamIds).toEqual(['team-dev-u13f', 'team-dev-u14f'])
+    const u13CoachPermissions = dataset.userTeamAccess.find(
+      ({ teamId }) => teamId === 'team-dev-u13f',
+    )?.rolePermissions['role-coach-principal'].permissions
+    expect(u13CoachPermissions).toEqual(
+      expect.arrayContaining(['tests.read', 'tests.write']),
+    )
   })
 
   it('crée les protocoles et benchmarks Tests DEV déterministes', () => {
