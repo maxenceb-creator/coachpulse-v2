@@ -214,8 +214,8 @@ function validateBusinessInvariants(dataset: BootstrapDataset) {
     ),
   )
   const accessScopes = new Set(
-    dataset.playerAccessScopes.map(({ playerAccessScopeId }) =>
-      playerAccessScopeId,
+    dataset.playerAccessScopes.map(
+      ({ playerAccessScopeId }) => playerAccessScopeId,
     ),
   )
   for (const scopeId of assignmentScopes) {

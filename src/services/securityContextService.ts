@@ -11,8 +11,14 @@ export const securityContextService = {
     activeTeamId: string
     activeSeasonId: string
   }) {
-    const { user, roles, accesses, activeRoleId, activeTeamId, activeSeasonId } =
-      input
+    const {
+      user,
+      roles,
+      accesses,
+      activeRoleId,
+      activeTeamId,
+      activeSeasonId,
+    } = input
     if (
       user.status !== 'ACTIVE' ||
       !user.roleIds.includes(activeRoleId) ||
