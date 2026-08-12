@@ -71,6 +71,8 @@ export const playerSchema = z
     playerProfile: z.enum(['GOALKEEPER', 'DEFENDER', 'MIDFIELDER', 'FORWARD']),
     preferredFoot: z.enum(['LEFT', 'RIGHT', 'UNKNOWN']),
     status: z.enum(['ACTIVE', 'INACTIVE']),
+    createdAt: date,
+    updatedAt: date,
   })
   .strict()
 export const assignmentSchema = z.object({

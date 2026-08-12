@@ -74,7 +74,11 @@ export function DashboardPage() {
             ['Saison active', c.season?.name],
             [
               'Joueuses accessibles',
-              count.isLoading ? '…' : String(count.data ?? 0),
+              count.isLoading
+                ? '…'
+                : count.isError
+                  ? 'Erreur de chargement'
+                  : String(count.data ?? 0),
             ],
           ].map(([a, b]) => (
             <article className="card" key={a}>

@@ -111,6 +111,9 @@ export function AppContext({ children }: { children: ReactNode }) {
         ...context,
       }),
     onSuccess: (_, context) => {
+      if (import.meta.env.DEV) {
+        console.debug('[Security context DEV] Contexte vérifié', context)
+      }
       client.setQueryData(keys.user(uid), (current: User | null | undefined) =>
         current ? { ...current, securityContext: context } : current,
       )

@@ -218,6 +218,15 @@ describe('Security Rules du socle et accès joueuses', () => {
     await assertSucceeds(assignmentsForTeam('user-a'))
     const db = testEnv.authenticatedContext('user-a').firestore()
     await assertSucceeds(getDoc(doc(db, 'players/player-a')))
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'players'),
+          where(documentId(), 'in', ['player-a']),
+          where('status', '==', 'ACTIVE'),
+        ),
+      ),
+    )
   })
 
   it("refuse une joueuse d'une autre Team", async () => {

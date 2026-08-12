@@ -9,6 +9,6 @@ export const usePlayerCount = (
 ) =>
   useQuery({
     queryKey: keys.count(t ?? '', s ?? '', r ?? ''),
-    queryFn: () => playersService.countEffectiveByTeam(t!, s!),
+    queryFn: () => playersService.countEffectiveByTeam(t!, s!, r!),
     enabled: !!t && !!s && !!r && securityContextReady,
   })
