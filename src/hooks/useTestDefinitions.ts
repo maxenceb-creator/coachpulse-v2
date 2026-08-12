@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
-import { testsService } from '../services/testsService'
+import { testsService } from '../services/appTestsService'
 import type { TeamAccess } from '../types/domain'
 
 export const useTestDefinitions = (context: {

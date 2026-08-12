@@ -4,10 +4,9 @@ import type {
   TestDefinition,
   TestMetricDefinition,
 } from '../types/domain'
-import {
-  testsRepository,
-  type TestBenchmarksQuery,
-  type TestsRepository,
+import type {
+  TestBenchmarksQuery,
+  TestsRepository,
 } from '../repositories/testsRepository'
 import { hasPermission } from './permissionsService'
 
@@ -140,5 +139,3 @@ export const createTestsService = (repository: TestsRepository) => ({
     return benchmarks
   },
 })
-
-export const testsService = createTestsService(testsRepository)
