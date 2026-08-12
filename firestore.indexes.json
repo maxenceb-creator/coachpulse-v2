@@ -36,6 +36,28 @@
         { "fieldPath": "teamId", "order": "ASCENDING" },
         { "fieldPath": "seasonId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "testSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "teamId", "order": "ASCENDING" },
+        { "fieldPath": "seasonId", "order": "ASCENDING" },
+        { "fieldPath": "testDefinitionId", "order": "ASCENDING" },
+        { "fieldPath": "testDefinitionVersion", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "testResults",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "teamId", "order": "ASCENDING" },
+        { "fieldPath": "seasonId", "order": "ASCENDING" },
+        { "fieldPath": "testDefinitionId", "order": "ASCENDING" },
+        { "fieldPath": "testDefinitionVersion", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

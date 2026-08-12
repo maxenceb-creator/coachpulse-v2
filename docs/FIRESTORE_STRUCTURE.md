@@ -358,3 +358,14 @@ TeamAccess compatible
 +
 AuditLog lorsque nécessaire
 ```
+
+## Analytics Tests PR08
+
+Les historiques Tests utilisent deux requêtes bornées et compatibles avec les
+Rules : `testSessions` terminées filtrées par Team/Saison/définition/version,
+puis `testResults` filtrés par le même contexte. Le service joint les documents
+par `testSessionId`; aucune date n'est dupliquée dans `TestResult`.
+
+Deux index composites couvrent ces requêtes. Les lectures ciblées de la
+`Category` active et de ses `SubCategory` sont autorisées avec `tests.read`
+uniquement afin de résoudre le benchmark historique.

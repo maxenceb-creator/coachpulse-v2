@@ -73,5 +73,28 @@ export const queryKeys = {
       seasonId: string,
       testSessionId: string,
     ) => ['testResults', uid, roleId, teamId, seasonId, testSessionId] as const,
+    analysisRoot: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+    ) => ['testAnalysis', uid, roleId, teamId, seasonId] as const,
+    analysis: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      testDefinitionId: string,
+      version: number,
+      metricKey: string,
+      playerId = 'all',
+    ) =>
+      [
+        ...queryKeys.tests.analysisRoot(uid, roleId, teamId, seasonId),
+        testDefinitionId,
+        version,
+        metricKey,
+        playerId,
+      ] as const,
   },
 }

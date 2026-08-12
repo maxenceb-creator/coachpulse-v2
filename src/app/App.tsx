@@ -9,6 +9,7 @@ import { LoginPage } from '../pages/LoginPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { TestsPage } from '../pages/TestsPage'
 import { TestSessionPage } from '../pages/TestSessionPage'
+import { TestAnalysisPage } from '../pages/TestAnalysisPage'
 import { AppContext } from './AppContext'
 function Guard() {
   const { user, loading } = useAuth()
@@ -29,6 +30,10 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <DashboardPage /> },
       { path: '/tests', element: <TestsPage /> },
+      {
+        path: '/tests/definitions/:testDefinitionId/analysis',
+        element: <TestAnalysisPage />,
+      },
       {
         path: '/tests/sessions/:testSessionId',
         element: <TestSessionPage />,

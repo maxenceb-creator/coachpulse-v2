@@ -209,6 +209,73 @@ input {
   display: flex;
   gap: 0.8rem;
 }
+.analysis-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  margin: 1.5rem 0;
+}
+.analysis-filters label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+.analysis-filters select {
+  border: 1px solid #bdd0c9;
+  border-radius: 0.65rem;
+  padding: 0.75rem;
+}
+.analysis-grid {
+  display: grid;
+  gap: 1rem;
+}
+.analysis-card {
+  padding: 1.2rem;
+}
+.analysis-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.analysis-stats div {
+  background: #f2f6f4;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+.analysis-stats dt {
+  color: #61736d;
+  font-size: 0.8rem;
+}
+.analysis-stats dd {
+  margin: 0.35rem 0 0;
+  font-weight: 800;
+}
+.evolution-chart {
+  margin: 1rem 0 0;
+  padding: 0.75rem;
+}
+.evolution-chart svg {
+  width: 100%;
+  max-height: 18rem;
+}
+.evolution-line {
+  fill: none;
+  stroke: #0b745e;
+  stroke-width: 1.6;
+}
+.evolution-chart circle {
+  fill: #0b745e;
+}
+.benchmark-line {
+  stroke: #c46b20;
+  stroke-dasharray: 3 2;
+  stroke-width: 1;
+}
+.evolution-chart figcaption {
+  color: #61736d;
+  font-size: 0.8rem;
+}
 .login,
 .center {
   min-height: 100vh;
@@ -242,6 +309,10 @@ input {
     grid-template-columns: 1fr;
   }
   .session-list {
+    grid-template-columns: 1fr;
+  }
+  .analysis-filters,
+  .analysis-stats {
     grid-template-columns: 1fr;
   }
 }

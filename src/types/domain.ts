@@ -51,6 +51,23 @@ export type Season = {
   status: 'PLANNED' | 'ACTIVE' | 'CLOSED'
   isActive: boolean
 }
+export type SubCategory = {
+  subCategoryId: string
+  seasonId: string
+  name: string
+  birthYearRule: number
+  createdAt: Date
+  updatedAt: Date
+}
+export type Category = {
+  categoryId: string
+  seasonId: string
+  name: string
+  subCategoryIds: string[]
+  status: 'ACTIVE' | 'INACTIVE'
+  createdAt: Date
+  updatedAt: Date
+}
 export type Player = {
   playerId: string
   firstName: string
@@ -151,4 +168,40 @@ export type TestResult = {
   createdBy: string
   createdAt: Date
   updatedAt: Date
+}
+
+export type MetricTrend = 'IMPROVED' | 'STABLE' | 'REGRESSED'
+export type TestComparisonCompatibility =
+  | 'COMPATIBLE'
+  | 'INCOMPATIBLE_DEFINITION'
+  | 'INCOMPATIBLE_VERSION'
+  | 'INCOMPATIBLE_METRIC'
+  | 'INCOMPATIBLE_UNIT'
+
+export type MetricPerformanceComparison = {
+  compatibility: TestComparisonCompatibility
+  previousValue: number
+  currentValue: number
+  delta?: number
+  directionalDelta?: number
+  relativeChange?: number
+  trend?: MetricTrend
+}
+
+export type BenchmarkComparison = {
+  targetValue: number
+  direction: TestMetricDefinition['direction']
+  status: 'ABOVE_TARGET' | 'ON_TARGET' | 'BELOW_TARGET' | 'NOT_APPLICABLE'
+  reached: boolean | null
+  rawDelta: number
+  directionalDelta?: number
+  relativeGap?: number
+}
+
+export type PlayerTestHistoryPoint = {
+  session: TestSession
+  result: TestResult
+  metricKey: string
+  unit: TestMetricDefinition['unit']
+  value: number
 }

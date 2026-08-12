@@ -1,11 +1,21 @@
-import { limit, orderBy, serverTimestamp, where } from 'firebase/firestore'
+import {
+  documentId,
+  limit,
+  orderBy,
+  serverTimestamp,
+  where,
+} from 'firebase/firestore'
 import type {
+  Category,
+  SubCategory,
   TestBenchmark,
   TestDefinition,
   TestResult,
   TestSession,
 } from '../types/domain'
 import {
+  categorySchema,
+  subCategorySchema,
   testBenchmarkSchema,
   testDefinitionSchema,
   testResultSchema,
@@ -57,7 +67,26 @@ export interface TestsRepository {
   ): Promise<void>
 }
 
-export const testsRepository: TestsRepository = {
+export interface TestsAnalyticsRepository {
+  getDefinitionById(testDefinitionId: string): Promise<TestDefinition | null>
+  getBenchmarks(query: TestBenchmarksQuery): Promise<TestBenchmark[]>
+  listCompletedSessionsByDefinition(
+    teamId: string,
+    seasonId: string,
+    testDefinitionId: string,
+    testDefinitionVersion: number,
+  ): Promise<TestSession[]>
+  listResultsByDefinition(
+    teamId: string,
+    seasonId: string,
+    testDefinitionId: string,
+    testDefinitionVersion: number,
+  ): Promise<TestResult[]>
+  getCategory(categoryId: string): Promise<Category | null>
+  getSubCategories(ids: string[]): Promise<SubCategory[]>
+}
+
+export const testsRepository: TestsRepository & TestsAnalyticsRepository = {
   getActiveDefinitions: () =>
     many('testDefinitions', testDefinitionSchema, [
       where('status', '==', 'ACTIVE'),
@@ -93,6 +122,41 @@ export const testsRepository: TestsRepository = {
       orderBy('date', 'desc'),
       limit(100),
     ]),
+  listCompletedSessionsByDefinition: (
+    teamId,
+    seasonId,
+    testDefinitionId,
+    testDefinitionVersion,
+  ) =>
+    many('testSessions', testSessionSchema, [
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      where('testDefinitionId', '==', testDefinitionId),
+      where('testDefinitionVersion', '==', testDefinitionVersion),
+      where('status', '==', 'COMPLETED'),
+      orderBy('date', 'desc'),
+      limit(100),
+    ]),
+  listResultsByDefinition: (
+    teamId,
+    seasonId,
+    testDefinitionId,
+    testDefinitionVersion,
+  ) =>
+    many('testResults', testResultSchema, [
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      where('testDefinitionId', '==', testDefinitionId),
+      where('testDefinitionVersion', '==', testDefinitionVersion),
+      limit(500),
+    ]),
+  getCategory: (categoryId) => one('categories', categoryId, categorySchema),
+  getSubCategories: (ids) =>
+    ids.length
+      ? many('subCategories', subCategorySchema, [
+          where(documentId(), 'in', ids.slice(0, 30)),
+        ])
+      : Promise.resolve([]),
   getResultsBySession: (testSessionId, teamId, seasonId) =>
     many('testResults', testResultSchema, [
       where('testSessionId', '==', testSessionId),

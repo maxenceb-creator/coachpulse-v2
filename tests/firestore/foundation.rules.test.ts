@@ -762,4 +762,42 @@ describe('Security Rules du socle et accès joueuses', () => {
       updateDoc(doc(db, 'users/user-a'), { status: 'INACTIVE' }),
     )
   })
+
+  it('autorise uniquement les référentiels Category et SubCategory du contexte Tests actif', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(getDoc(doc(db, 'categories/category-a')))
+    await assertSucceeds(getDoc(doc(db, 'subCategories/subcat-a')))
+    await assertFails(getDoc(doc(db, 'categories/category-b')))
+    await assertFails(getDoc(doc(db, 'subCategories/subcat-b')))
+  })
+
+  it('autorise les formes de requêtes analytics filtrées au contexte actif', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testSessions'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          where('testDefinitionVersion', '==', 1),
+          where('status', '==', 'COMPLETED'),
+          orderBy('date', 'desc'),
+          limit(100),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testResults'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          where('testDefinitionVersion', '==', 1),
+          limit(500),
+        ),
+      ),
+    )
+  })
 })

@@ -117,6 +117,14 @@ export const useSaveTestResults = (context: TestHookContext) => {
             input.session.testSessionId,
           ),
         })
+      void client.invalidateQueries({
+        queryKey: queryKeys.tests.analysisRoot(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+        ),
+      })
     },
   })
 }
@@ -242,6 +250,14 @@ export const useDeleteTestSession = (context: TestHookContext) => {
         exact: true,
       })
       void client.invalidateQueries({ queryKey: sessionsKey, exact: true })
+      void client.invalidateQueries({
+        queryKey: queryKeys.tests.analysisRoot(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+        ),
+      })
     },
     onError: (error, testSessionId) => {
       if (!import.meta.env.DEV) return
