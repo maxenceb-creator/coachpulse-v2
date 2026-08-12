@@ -12,6 +12,13 @@ export const userSchema = z.object({
   linkedPlayerId: z.string().optional(),
   roleIds: z.array(z.string()).min(1),
   preferredActiveRoleId: z.string().optional(),
+  securityContext: z
+    .object({
+      activeRoleId: z.string(),
+      activeTeamId: z.string(),
+      activeSeasonId: z.string(),
+    })
+    .optional(),
 })
 export const roleSchema = z.object({
   roleId: z.string(),

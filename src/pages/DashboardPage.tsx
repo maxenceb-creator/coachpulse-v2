@@ -4,7 +4,12 @@ import { usePlayerCount } from '../hooks/usePlayerCount'
 export function DashboardPage() {
   const { logout } = useAuth(),
     c = useApp(),
-    count = usePlayerCount(c.activeTeamId, c.season?.seasonId, c.activeRoleId)
+    count = usePlayerCount(
+      c.activeTeamId,
+      c.season?.seasonId,
+      c.activeRoleId,
+      c.securityContextReady,
+    )
   if (c.loading)
     return <main className="center">Chargement de votre espace…</main>
   if (c.error)

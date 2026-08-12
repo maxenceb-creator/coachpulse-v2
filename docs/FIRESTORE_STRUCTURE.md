@@ -27,6 +27,7 @@ categories/
 teams/
 players/
 playerTeamAssignments/
+playerAccessScopes/
 sessions/
 sessionParticipants/
 attendance/
@@ -54,6 +55,14 @@ auditLogs/
 
 ## users
 `users/{userId}` : identité utilisateur, status, linkedPlayerId?, roleIds[], preferredActiveRoleId?, timestamps. `userId` = Firebase Auth UID.
+
+### Contexte de sécurité actif
+
+`users/{userId}.securityContext` contient `activeRoleId`, `activeTeamId` et
+`activeSeasonId`. Le client ne peut modifier que ce champ, sur son propre
+document. Les Security Rules vérifient que le rôle est attribué et actif, que
+le TeamAccess est actif et temporellement valide, et que la saison est active.
+Ce contexte sélectionne des droits déjà accordés ; il n'en crée aucun.
 
 ## roles
 `roles/{roleId}` : code, label, description?, isActive, defaultPermissions[], timestamps. Les rôles sont ajoutables, modifiables et désactivables.
@@ -94,6 +103,18 @@ Player ne contient jamais comme vérité permanente : teamId, categoryId, subCat
 `playerTeamAssignments/{assignmentId}` contient playerId, teamId, assignmentType, startDate, endDate?, status et audit technique.
 
 Types : PRIMARY, SECONDARY, TEMPORARY. PRIMARY est défini manuellement et reste temporel.
+
+## playerAccessScopes
+
+`playerAccessScopes/{playerId}_{teamId}_{seasonId}` est un index d'autorisation
+dérivé de `PlayerTeamAssignment`. Il contient `playerId`, `teamId`, `seasonId`,
+`status`, `startDate`, `endDate?` et `source = PLAYER_TEAM_ASSIGNMENT`.
+
+Cet index n'est pas une seconde source métier : il est illisible et non
+inscriptible par les clients et sert uniquement aux Security Rules pour un
+`get()` déterministe lors de la lecture de `players/{playerId}`. Toute future
+mutation d'affectation devra le maintenir dans la même commande serveur ou
+transaction privilégiée.
 
 ## sessions
 `sessions/{sessionId}` contient seasonId, categoryId, dates/heures, durées, type et status.

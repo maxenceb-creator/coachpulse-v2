@@ -7,6 +7,11 @@ export type User = {
   linkedPlayerId?: string
   roleIds: string[]
   preferredActiveRoleId?: string
+  securityContext?: {
+    activeRoleId: string
+    activeTeamId: string
+    activeSeasonId: string
+  }
 }
 export type Role = {
   roleId: string
