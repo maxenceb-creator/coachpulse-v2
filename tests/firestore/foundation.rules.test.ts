@@ -4,7 +4,16 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import {
+  collection,
+  doc,
+  documentId,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore'
 import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest'
 
@@ -55,6 +64,28 @@ beforeEach(async () => {
         },
       },
     })
+    await setDoc(doc(db, 'teams/team-a'), {
+      name: 'U13F',
+      status: 'ACTIVE',
+    })
+    await setDoc(doc(db, 'teams/team-b'), {
+      name: 'U14F',
+      status: 'ACTIVE',
+    })
+    await setDoc(doc(db, 'teams/team-without-access'), {
+      name: 'Équipe inaccessible',
+      status: 'ACTIVE',
+    })
+    await setDoc(doc(db, 'seasons/season-active'), {
+      name: '2026-2027',
+      status: 'ACTIVE',
+      isActive: true,
+    })
+    await setDoc(doc(db, 'seasons/season-closed'), {
+      name: '2025-2026',
+      status: 'CLOSED',
+      isActive: false,
+    })
   })
 })
 
@@ -88,6 +119,35 @@ describe('Security Rules du socle', () => {
     const db = testEnv.authenticatedContext('user-a').firestore()
     await assertSucceeds(getDoc(doc(db, 'userTeamAccess/user-a_team-a')))
     await assertFails(getDoc(doc(db, 'userTeamAccess/user-b_team-b')))
+  })
+
+  it('autorise la requête des Teams ayant un TeamAccess actif', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'teams'),
+          where(documentId(), 'in', ['team-a']),
+          where('status', '==', 'ACTIVE'),
+        ),
+      ),
+    )
+    await assertFails(getDoc(doc(db, 'teams/team-b')))
+    await assertFails(getDoc(doc(db, 'teams/team-without-access')))
+  })
+
+  it('autorise uniquement la requête de la saison active', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'seasons'),
+          where('isActive', '==', true),
+          where('status', '==', 'ACTIVE'),
+        ),
+      ),
+    )
+    await assertFails(getDoc(doc(db, 'seasons/season-closed')))
   })
 
   it('refuse les écritures client sur les collections du socle', async () => {
