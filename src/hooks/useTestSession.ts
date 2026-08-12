@@ -38,17 +38,16 @@ export const useTestSession = (context: TestHookContext, id: string) => {
     enabled,
   })
   const definition = useQuery({
-    queryKey: queryKeys.tests.definitions(
+    queryKey: queryKeys.tests.definition(
       context.uid,
       context.roleId,
       context.teamId,
       context.seasonId,
+      session.data?.testDefinitionId ?? '',
+      session.data?.testDefinitionVersion ?? 0,
     ),
     queryFn: () =>
-      testsService.getDefinitionById(
-        security(context),
-        session.data!.testDefinitionId,
-      ),
+      testsService.getDefinitionForSession(security(context), session.data!),
     enabled: enabled && !!session.data,
   })
   const players = useQuery({

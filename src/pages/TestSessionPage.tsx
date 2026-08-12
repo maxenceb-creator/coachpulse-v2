@@ -8,6 +8,7 @@ import {
   type TestHookContext,
 } from '../hooks/useTestSession'
 import { metricColumns } from '../services/testEntryColumns'
+import { resolveTestSessionPageState } from './testSessionPageState'
 
 export function TestSessionPage() {
   const { testSessionId = '' } = useParams()
@@ -44,20 +45,20 @@ export function TestSessionPage() {
     )
   }, [data.results.data])
 
-  const queries = [data.session, data.definition, data.players, data.results]
-  if (app.loading || queries.some((query) => query.isLoading))
+  const pageState = resolveTestSessionPageState({
+    appError: app.error,
+    appLoading: app.loading,
+    session: data.session,
+    definition: data.definition,
+    players: data.players,
+    results: data.results,
+  })
+  if (pageState.status === 'loading')
     return <main className="center">Chargement de la session…</main>
-  if (app.error || queries.some((query) => query.isError))
-    return (
-      <main className="center error">
-        Session inaccessible dans ce contexte.
-      </main>
-    )
+  if (pageState.status === 'error')
+    return <main className="center error">{pageState.message}</main>
 
-  const session = data.session.data
-  const definition = data.definition.data
-  const players = data.players.data
-  if (!session || !definition || !players) return null
+  const { session, definition, players } = pageState
   const columns = metricColumns(definition)
   const editable = session.status === 'DRAFT'
   const submit = (complete: boolean) => {

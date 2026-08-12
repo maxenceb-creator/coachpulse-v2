@@ -272,6 +272,44 @@ describe('testsService', () => {
     ).rejects.toMatchObject({ code: 'TEST_DEFINITION_VERSION_MISMATCH' })
   })
 
+  it('recharge la définition exacte référencée par une session', async () => {
+    const repository = repositoryMock()
+    const service = createTestsService(repository)
+    const context = {
+      userId: 'user',
+      activeRoleId: 'coach',
+      teamId: 'team',
+      accesses,
+    }
+    const session = {
+      testSessionId: 'session',
+      testDefinitionId: definition.testDefinitionId,
+      testDefinitionVersion: definition.version,
+      teamId: 'team',
+      seasonId: 'season-2026',
+      categoryId: 'category',
+      date: now,
+      status: 'DRAFT' as const,
+      createdBy: 'user',
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    await expect(
+      service.getDefinitionForSession(context, session),
+    ).resolves.toEqual(definition)
+    expect(repository.getDefinitionById).toHaveBeenCalledWith(
+      definition.testDefinitionId,
+    )
+
+    await expect(
+      service.getDefinitionForSession(context, {
+        ...session,
+        testDefinitionVersion: definition.version + 1,
+      }),
+    ).rejects.toMatchObject({ code: 'TEST_DEFINITION_VERSION_MISMATCH' })
+  })
+
   it('sauvegarde zéro sous un ID déterministe et refuse une joueuse hors scope', async () => {
     const repository = repositoryMock()
     const service = createTestsService(repository)

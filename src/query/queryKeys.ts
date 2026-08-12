@@ -23,6 +23,23 @@ export const queryKeys = {
       teamId: string,
       seasonId: string,
     ) => ['testDefinitions', uid, roleId, teamId, seasonId, 'active'] as const,
+    definition: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      testDefinitionId: string,
+      version: number,
+    ) =>
+      [
+        'testDefinition',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        testDefinitionId,
+        version,
+      ] as const,
     benchmarks: (
       uid: string,
       roleId: string,

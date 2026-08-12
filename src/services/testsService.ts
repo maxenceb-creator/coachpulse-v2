@@ -179,6 +179,21 @@ export const createTestsService = (repository: TestsServiceRepository) => ({
     if (!definition) throw new TestsDomainError('TEST_DEFINITION_NOT_FOUND')
     return definition
   },
+  async getDefinitionForSession(
+    context: TestsSecurityContext,
+    session: TestSession,
+  ) {
+    requireTestsRead(context)
+    if (session.teamId !== context.teamId)
+      throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
+    const definition = await repository.getDefinitionById(
+      session.testDefinitionId,
+    )
+    if (!definition) throw new TestsDomainError('TEST_DEFINITION_NOT_FOUND')
+    if (definition.version !== session.testDefinitionVersion)
+      throw new TestsDomainError('TEST_DEFINITION_VERSION_MISMATCH')
+    return definition
+  },
   async getApplicableBenchmarks(
     context: TestsSecurityContext,
     query: TestBenchmarksQuery,
