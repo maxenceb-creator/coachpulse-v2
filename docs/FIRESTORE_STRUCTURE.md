@@ -142,7 +142,9 @@ TrainingLoad n'a pas de collection source : il est dérivé de Session + Attenda
 `testDefinitions/{testDefinitionId}` contient `code`, `version`, le protocole
 et ses `metrics[]` structurées. Une métrique PR06 contient `metricKey`, `label`,
 `valueType = NUMBER`, une unité normalisée, `direction`, `required` et ses
-bornes/précision éventuelles.
+bornes/précision éventuelles. PR09 ajoute `order` et le cycle
+`DRAFT → ACTIVE → ARCHIVED`. L'ancien `INACTIVE` reste lisible pendant la
+migration. Les écritures d'administration exigent `tests.manage`.
 
 ## testBenchmarks
 `testBenchmarks/{testBenchmarkId}` contient `testDefinitionId`,
@@ -151,10 +153,14 @@ cible, `seasonId` pour les benchmarks saisonniers et statut.
 
 Les benchmarks sont des références, jamais une copie de TestResult.
 
+Leur ID est déterministe sur saison, sous-catégorie, définition/version,
+métrique et niveau afin d'empêcher deux benchmarks ACTIVE concurrents.
+
 PR06 autorise leur lecture uniquement avec `tests.read` dans le contexte de
 sécurité actif. Pour un benchmark, la Team active doit être DEVELOPMENT, sa
 Category doit contenir `subCategoryId` et la saison doit correspondre. Les
-écritures client restent refusées ; les seeds DEV utilisent Firebase Admin.
+écritures client sont réservées à `tests.manage` et validées dans ce même
+contexte ; les seeds DEV utilisent Firebase Admin.
 
 ## testSessions
 `testSessions/{testSessionId}` contient testDefinitionId,

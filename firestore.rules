@@ -157,6 +157,90 @@ service cloud.firestore {
         && validTestTeamContext(data, 'tests.write');
     }
 
+    function validTestDefinitionCreate(testDefinitionId) {
+      let data = request.resource.data;
+      return canInActiveSecurityContext('tests.manage')
+        && data.keys().hasOnly([
+          'name', 'code', 'description', 'domain', 'status', 'version',
+          'metrics', 'attemptPolicy', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.name is string
+        && data.code is string
+        && data.domain in ['TECHNICAL', 'PHYSICAL']
+        && data.status == 'DRAFT'
+        && data.version is int
+        && data.version > 0
+        && data.metrics is list
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function validTestDefinitionUpdate() {
+      let data = request.resource.data;
+      let immutable = data.code == resource.data.code
+        && data.version == resource.data.version
+        && data.createdAt == resource.data.createdAt
+        && (
+          (!('createdBy' in resource.data) && !('createdBy' in data))
+          || data.createdBy == resource.data.createdBy
+        );
+      let draftEdit = resource.data.status == 'DRAFT'
+        && data.status in ['DRAFT', 'ACTIVE']
+        && (data.status != 'ACTIVE' || data.metrics.size() > 0);
+      let archiveOnly = resource.data.status in ['ACTIVE', 'INACTIVE']
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt'])
+        && data.status == 'ARCHIVED';
+      return canInActiveSecurityContext('tests.manage')
+        && immutable
+        && data.keys().hasOnly([
+          'name', 'code', 'description', 'domain', 'status', 'version',
+          'metrics', 'attemptPolicy', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.name is string
+        && data.code is string
+        && data.domain in ['TECHNICAL', 'PHYSICAL']
+        && data.version is int
+        && data.version > 0
+        && data.metrics is list
+        && data.updatedAt == request.time
+        && (draftEdit || archiveOnly);
+    }
+
+    function validBenchmarkWrite(testBenchmarkId, creating) {
+      let data = request.resource.data;
+      let definition = get(
+        /databases/$(database)/documents/testDefinitions/$(data.testDefinitionId)
+      );
+      return canInActiveSecurityContext('tests.manage')
+        && benchmarkInActiveCategory(data)
+        && data.keys().hasOnly([
+          'testDefinitionId', 'testDefinitionVersion', 'metricKey',
+          'subCategoryId', 'seasonId', 'benchmarkLevel', 'targetValue',
+          'label', 'status', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.testDefinitionVersion == definition.data.version
+        && data.benchmarkLevel in ['TARGET', 'GOOD', 'VERY_GOOD', 'REFERENCE']
+        && data.targetValue is number
+        && data.status in ['ACTIVE', 'ARCHIVED']
+        && data.updatedAt == request.time
+        && (
+          (creating
+            && data.createdBy == request.auth.uid
+            && data.createdAt == request.time)
+          || (!creating
+            && data.createdBy == resource.data.createdBy
+            && data.createdAt == resource.data.createdAt
+            && data.testDefinitionId == resource.data.testDefinitionId
+            && data.testDefinitionVersion == resource.data.testDefinitionVersion
+            && data.metricKey == resource.data.metricKey
+            && data.subCategoryId == resource.data.subCategoryId
+            && data.seasonId == resource.data.seasonId
+            && data.benchmarkLevel == resource.data.benchmarkLevel)
+        );
+    }
+
     function testSessionAfter(sessionId) {
       return getAfter(/databases/$(database)/documents/testSessions/$(sessionId));
     }
@@ -278,13 +362,18 @@ service cloud.firestore {
 
     match /testDefinitions/{testDefinitionId} {
       allow read: if canInActiveSecurityContext('tests.read');
-      allow write: if false;
+      allow create: if validTestDefinitionCreate(testDefinitionId);
+      allow update: if validTestDefinitionUpdate();
+      allow delete: if canInActiveSecurityContext('tests.manage')
+        && resource.data.status == 'DRAFT';
     }
 
     match /testBenchmarks/{testBenchmarkId} {
       allow read: if canInActiveSecurityContext('tests.read')
         && benchmarkInActiveCategory(resource.data);
-      allow write: if false;
+      allow create: if validBenchmarkWrite(testBenchmarkId, true);
+      allow update: if validBenchmarkWrite(testBenchmarkId, false);
+      allow delete: if false;
     }
 
     match /testSessions/{testSessionId} {

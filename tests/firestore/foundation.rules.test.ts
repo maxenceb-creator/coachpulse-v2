@@ -54,10 +54,11 @@ beforeEach(async () => {
       write('roles/analyst', { isActive: true }),
       write('roles/reader', { isActive: true }),
       write('roles/admin', { isActive: true }),
+      write('roles/manager', { isActive: true }),
       write('roles/inactive-role', { isActive: false }),
       write('users/user-a', {
         status: 'ACTIVE',
-        roleIds: ['coach', 'analyst', 'reader', 'inactive-role'],
+        roleIds: ['coach', 'analyst', 'reader', 'manager', 'inactive-role'],
         securityContext: securityContext('coach'),
       }),
       write('users/user-disabled', {
@@ -91,6 +92,10 @@ beforeEach(async () => {
           },
           analyst: { permissions: [], medicalAccessLevel: 'NONE' },
           reader: { permissions: ['tests.read'], medicalAccessLevel: 'NONE' },
+          manager: {
+            permissions: ['tests.read', 'tests.manage'],
+            medicalAccessLevel: 'NONE',
+          },
           'inactive-role': {
             permissions: ['players.read'],
             medicalAccessLevel: 'NONE',
@@ -329,6 +334,121 @@ describe('Security Rules du domaine Tests PR06', () => {
       setDoc(doc(db, 'testBenchmarks/new-benchmark'), {
         status: 'ACTIVE',
       }),
+    )
+  })
+})
+
+describe('Security Rules administration Tests PR09', () => {
+  const definitionData = (overrides: Record<string, unknown> = {}) => ({
+    name: 'Agilité 5-10-5 DEV',
+    code: 'AGILITY_5_10_5',
+    domain: 'PHYSICAL',
+    status: 'DRAFT',
+    version: 1,
+    metrics: [],
+    createdBy: 'user-a',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  })
+
+  it('distingue tests.write de tests.manage pour les définitions', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertFails(
+      setDoc(doc(db, 'testDefinitions/test-agility-v1'), definitionData()),
+    )
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('manager'),
+      }),
+    )
+    await assertSucceeds(
+      setDoc(doc(db, 'testDefinitions/test-agility-v1'), definitionData()),
+    )
+  })
+
+  it('autorise activation valide puis interdit la mutation structurelle ACTIVE', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await updateDoc(doc(db, 'users/user-a'), {
+      securityContext: securityContext('manager'),
+    })
+    const reference = doc(db, 'testDefinitions/test-agility-v1')
+    await setDoc(reference, definitionData())
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'ACTIVE',
+        metrics: [
+          {
+            metricKey: 'TIME',
+            label: 'Temps',
+            valueType: 'NUMBER',
+            unit: 'SECOND',
+            direction: 'LOWER_IS_BETTER',
+            required: true,
+            minValue: 0,
+            precision: 2,
+            order: 0,
+          },
+        ],
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      updateDoc(reference, {
+        name: 'Mutation interdite',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'ARCHIVED',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('réserve les benchmarks au manager et au contexte de sous-catégorie actif', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const data = {
+      testDefinitionId: 'juggling-v1',
+      testDefinitionVersion: 1,
+      metricKey: 'STRONG_FOOT',
+      subCategoryId: 'subcat-a',
+      seasonId,
+      benchmarkLevel: 'TARGET',
+      targetValue: 0,
+      status: 'ACTIVE',
+      createdBy: 'user-a',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+    await assertFails(setDoc(doc(db, 'testBenchmarks/new-target'), data))
+    await updateDoc(doc(db, 'users/user-a'), {
+      securityContext: securityContext('manager'),
+    })
+    await assertSucceeds(setDoc(doc(db, 'testBenchmarks/new-target'), data))
+    await assertFails(
+      setDoc(doc(db, 'testBenchmarks/outside-target'), {
+        ...data,
+        subCategoryId: 'subcat-b',
+      }),
+    )
+  })
+
+  it('refuse utilisateur désactivé et rôle falsifié', async () => {
+    const disabled = testEnv.authenticatedContext('user-disabled').firestore()
+    const forged = testEnv.authenticatedContext('user-forged-role').firestore()
+    await assertFails(
+      setDoc(
+        doc(disabled, 'testDefinitions/disabled-v1'),
+        definitionData({ createdBy: 'user-disabled' }),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(forged, 'testDefinitions/forged-v1'),
+        definitionData({ createdBy: 'user-forged-role' }),
+      ),
     )
   })
 })

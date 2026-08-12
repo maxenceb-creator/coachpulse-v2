@@ -121,6 +121,7 @@ export const testMetricDefinitionSchema = z
     precision: z.number().int().min(0).max(6).optional(),
     minValue: z.number().finite().optional(),
     maxValue: z.number().finite().optional(),
+    order: z.number().int().min(0).optional(),
   })
   .strict()
   .refine(
@@ -136,9 +137,9 @@ export const testDefinitionSchema = z
     code: metricKeySchema,
     description: z.string().min(1).optional(),
     domain: z.enum(['TECHNICAL', 'PHYSICAL']),
-    status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']),
+    status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED']),
     version: z.number().int().positive(),
-    metrics: z.array(testMetricDefinitionSchema).min(1),
+    metrics: z.array(testMetricDefinitionSchema),
     attemptPolicy: z
       .object({
         maxAttempts: z.number().int().positive().optional(),
@@ -148,6 +149,7 @@ export const testDefinitionSchema = z
       .optional(),
     createdAt: date,
     updatedAt: date,
+    createdBy: z.string().min(1).optional(),
   })
   .strict()
   .refine(
@@ -156,6 +158,10 @@ export const testDefinitionSchema = z
       metrics.length,
     { message: 'Les metricKey doivent être uniques', path: ['metrics'] },
   )
+  .refine(({ status, metrics }) => status !== 'ACTIVE' || metrics.length > 0, {
+    message: 'Une définition ACTIVE doit contenir au moins une métrique',
+    path: ['metrics'],
+  })
 
 export const testBenchmarkSchema = z
   .object({
@@ -171,6 +177,7 @@ export const testBenchmarkSchema = z
     status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']),
     createdAt: date,
     updatedAt: date,
+    createdBy: z.string().min(1).optional(),
   })
   .strict()
 

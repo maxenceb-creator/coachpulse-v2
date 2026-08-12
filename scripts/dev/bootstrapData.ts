@@ -216,7 +216,7 @@ const adminPermissions = [
   'players.manageAssignments',
   'tests.read',
   'tests.write',
-  'testDefinitions.manage',
+  'tests.manage',
 ]
 const coachPermissions = [
   'players.read',
@@ -224,6 +224,7 @@ const coachPermissions = [
   'attendance.read',
   'tests.read',
   'tests.write',
+  'tests.manage',
 ]
 const analystPermissions = ['players.read', 'matches.read', 'tests.read']
 

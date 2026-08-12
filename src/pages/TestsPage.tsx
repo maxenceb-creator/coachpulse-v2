@@ -40,6 +40,12 @@ export function TestsPage() {
     teamId: context.activeTeamId ?? '',
     permissionKey: 'tests.write',
   })
+  const canManageTests = hasPermission(context.accesses, {
+    userId: user?.uid ?? '',
+    activeRoleId: context.activeRoleId ?? '',
+    teamId: context.activeTeamId ?? '',
+    permissionKey: 'tests.manage',
+  })
   const creationDisabledReason = !context.securityContextReady
     ? 'Contexte de sécurité non prêt'
     : !canWriteTests
@@ -96,6 +102,11 @@ export function TestsPage() {
       <main className="dashboard">
         <h1>Protocoles de tests</h1>
         <p>Définitions accessibles dans votre contexte de travail actuel.</p>
+        {canManageTests ? (
+          <Link className="button-link secondary" to="/tests/admin">
+            Administrer le catalogue
+          </Link>
+        ) : null}
         <label className="session-date card">
           Date de la nouvelle session
           <input

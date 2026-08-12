@@ -479,7 +479,7 @@ SELF
 ```text
 tests.read
 tests.write
-testDefinitions.manage
+tests.manage
 ```
 
 ---
@@ -995,7 +995,7 @@ rpe.staffWrite
 ```text
 tests.read
 tests.write
-testDefinitions.manage
+tests.manage
 ```
 
 ## Match
@@ -1155,7 +1155,7 @@ Cette permission est évaluée dans le contexte Team concerné et ne permet pas 
 La gestion des `TestBenchmark` est initialement couverte par :
 
 ```text
-testDefinitions.manage
+tests.manage
 ```
 
 Une permission dédiée pourra être ajoutée ultérieurement si le besoin opérationnel le justifie.
