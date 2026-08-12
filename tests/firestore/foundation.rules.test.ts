@@ -506,6 +506,40 @@ describe('Security Rules TestSession/TestResult PR07', () => {
     batch.delete(doc(db, 'testResults/session-existing_player-a'))
     batch.delete(doc(db, 'testSessions/session-existing'))
     await assertSucceeds(batch.commit())
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      expect(
+        (await getDoc(doc(admin, 'testSessions/session-existing'))).exists(),
+      ).toBe(false)
+      expect(
+        (
+          await getDocs(
+            query(
+              collection(admin, 'testResults'),
+              where('testSessionId', '==', 'session-existing'),
+            ),
+          )
+        ).empty,
+      ).toBe(true)
+    })
+  })
+
+  it('autorise la suppression d’une session DRAFT vide', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'testSessions/empty-draft'),
+        sessionData(),
+      )
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'testSessions/empty-draft')))
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      expect(
+        (
+          await getDoc(doc(context.firestore(), 'testSessions/empty-draft'))
+        ).exists(),
+      ).toBe(false)
+    })
   })
 
   it('autorise la suppression confirmée côté UI d’une session COMPLETED', async () => {
@@ -520,6 +554,17 @@ describe('Security Rules TestSession/TestResult PR07', () => {
     batch.delete(doc(db, 'testResults/session-existing_player-a'))
     batch.delete(doc(db, 'testSessions/session-existing'))
     await assertSucceeds(batch.commit())
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      expect(
+        (await getDoc(doc(admin, 'testSessions/session-existing'))).exists(),
+      ).toBe(false)
+      expect(
+        (
+          await getDoc(doc(admin, 'testResults/session-existing_player-a'))
+        ).exists(),
+      ).toBe(false)
+    })
   })
 
   it('refuse delete sans tests.write, autre Team ou autre saison', async () => {

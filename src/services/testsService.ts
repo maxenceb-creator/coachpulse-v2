@@ -22,6 +22,28 @@ export type TestsSecurityContext = {
   accesses: TeamAccess[]
 }
 
+type TestSessionDeleteStage =
+  'load-session' | 'load-results' | 'delete-results' | 'delete-session'
+
+const logDeleteFailure = (
+  testSessionId: string,
+  stage: TestSessionDeleteStage,
+  error: unknown,
+  details: { status?: TestSession['status']; resultCount?: number } = {},
+) => {
+  if (!import.meta.env.DEV) return
+  const failure = error as Error & { code?: string }
+  console.error('[TestSession DEV] Suppression échouée', {
+    testSessionId,
+    status: details.status ?? 'UNKNOWN',
+    resultCount: details.resultCount ?? 'UNKNOWN',
+    stage,
+    code: failure.code ?? 'UNKNOWN',
+    message: failure.message,
+    error,
+  })
+}
+
 export class TestsDomainError extends Error {
   constructor(
     public readonly code:
@@ -305,18 +327,51 @@ export const createTestsService = (repository: TestsServiceRepository) => ({
     seasonId: string,
   ) {
     requireTestsWrite(context)
-    const session = await repository.getSessionById(testSessionId)
+    let session: TestSession | null
+    try {
+      session = await repository.getSessionById(testSessionId)
+    } catch (error) {
+      logDeleteFailure(testSessionId, 'load-session', error)
+      throw error
+    }
     if (!session) throw new TestsDomainError('TEST_SESSION_NOT_FOUND')
     if (session.teamId !== context.teamId || session.seasonId !== seasonId)
       throw new TestsDomainError('TEST_CONTEXT_MISMATCH')
-    const results = await repository.getResultsForDeletion(
-      session.testSessionId,
-      session.teamId,
-      session.seasonId,
-    )
+    let results: TestResult[]
+    try {
+      results = await repository.getResultsForDeletion(
+        session.testSessionId,
+        session.teamId,
+        session.seasonId,
+      )
+    } catch (error) {
+      logDeleteFailure(testSessionId, 'load-results', error, {
+        status: session.status,
+      })
+      throw error
+    }
     if (results.length > 499)
       throw new TestsDomainError('TEST_SESSION_DELETE_TOO_LARGE')
-    await repository.deleteSessionWithResults(session, results)
+    try {
+      await repository.deleteSessionWithResults(session, results)
+    } catch (error) {
+      // Les deux suppressions appartiennent au même batch : Firestore ne peut
+      // pas identifier un document fautif sans rejeter l'ensemble atomique.
+      logDeleteFailure(
+        testSessionId,
+        results.length ? 'delete-results' : 'delete-session',
+        error,
+        { status: session.status, resultCount: results.length },
+      )
+      throw error
+    }
+    if (import.meta.env.DEV) {
+      console.debug('[TestSession DEV] Suppression réussie', {
+        testSessionId,
+        status: session.status,
+        resultCount: results.length,
+      })
+    }
     return session
   },
   async saveResults(

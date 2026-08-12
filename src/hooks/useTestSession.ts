@@ -243,5 +243,15 @@ export const useDeleteTestSession = (context: TestHookContext) => {
       })
       void client.invalidateQueries({ queryKey: sessionsKey, exact: true })
     },
+    onError: (error, testSessionId) => {
+      if (!import.meta.env.DEV) return
+      const failure = error as Error & { code?: string }
+      console.error('[TestSession DEV] Mutation de suppression refusée', {
+        testSessionId,
+        code: failure.code ?? 'UNKNOWN',
+        message: failure.message,
+        error,
+      })
+    },
   })
 }
