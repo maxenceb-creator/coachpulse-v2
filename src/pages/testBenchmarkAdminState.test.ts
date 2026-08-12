@@ -4,6 +4,7 @@ import type { TestMetricDefinition } from '../types/domain'
 import {
   benchmarkCreationErrorMessage,
   benchmarkMetricOptions,
+  definitionSaveErrorMessage,
   hasUnsavedBenchmarkMetrics,
 } from './testBenchmarkAdminState'
 
@@ -54,5 +55,26 @@ describe('administration des benchmarks', () => {
     ],
   ])('distingue les erreurs de création', (error, message) => {
     expect(benchmarkCreationErrorMessage(error)).toBe(message)
+  })
+
+  it.each([
+    [
+      new TestsCatalogueError('TEST_DEFINITION_INVALID'),
+      'Brouillon invalide : vérifiez les clés, libellés, unités, bornes et précisions des métriques.',
+    ],
+    [
+      new TestsCatalogueError('TEST_DEFINITION_IMMUTABLE'),
+      'Protocole immutable : seules les définitions DRAFT peuvent être modifiées.',
+    ],
+    [
+      { code: 'permission-denied' },
+      'Non autorisé : permission tests.manage requise.',
+    ],
+    [
+      new Error('network'),
+      'Erreur Firestore lors de la sauvegarde du brouillon.',
+    ],
+  ])('distingue les erreurs de sauvegarde', (error, message) => {
+    expect(definitionSaveErrorMessage(error)).toBe(message)
   })
 })

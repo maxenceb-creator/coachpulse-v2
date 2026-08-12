@@ -128,6 +128,60 @@ describe('testsCatalogueService', () => {
     ).rejects.toMatchObject({ code: 'TEST_DEFINITION_USED' })
   })
 
+  it('sauvegarde HEIGHT dans une définition DRAFT existante', async () => {
+    const repo = repository(definition({ metrics: [] }))
+    const service = createTestsCatalogueService(repo)
+    const metrics = [
+      {
+        metricKey: 'HEIGHT',
+        label: 'Hauteur',
+        valueType: 'NUMBER' as const,
+        unit: 'CENTIMETER' as const,
+        direction: 'HIGHER_IS_BETTER' as const,
+        precision: 0,
+        minValue: 0,
+        maxValue: 100,
+        required: true,
+        order: 0,
+      },
+    ]
+
+    const saved = await service.updateDraft(context(), 'test-generic-v1', {
+      name: 'Test générique PR09',
+      code: 'GENERIC',
+      domain: 'PHYSICAL',
+      metrics,
+    })
+
+    expect(saved.metrics).toEqual(metrics)
+    expect(repo.updateDefinition).toHaveBeenCalledWith(
+      'test-generic-v1',
+      expect.objectContaining({ metrics }),
+    )
+  })
+
+  it('refuse explicitement une métrique invalide dans un DRAFT', async () => {
+    const repo = repository(definition({ metrics: [] }))
+    const service = createTestsCatalogueService(repo)
+
+    await expect(
+      service.updateDraft(context(), 'test-generic-v1', {
+        name: 'Test générique PR09',
+        code: 'GENERIC',
+        domain: 'PHYSICAL',
+        metrics: [
+          {
+            ...definition().metrics[0],
+            metricKey: 'HEIGHT',
+            minValue: 100,
+            maxValue: 0,
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'TEST_DEFINITION_INVALID' })
+    expect(repo.updateDefinition).not.toHaveBeenCalled()
+  })
+
   it('crée v2 sans modifier v1 et utilise un ID déterministe concurrent-safe', async () => {
     const v1 = definition({ status: 'ACTIVE' })
     const repo = repository(v1)

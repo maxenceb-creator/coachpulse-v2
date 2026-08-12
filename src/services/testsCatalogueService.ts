@@ -180,7 +180,17 @@ export const createTestsCatalogueService = (
         metrics: sortTestMetrics(input.metrics),
         updatedAt: new Date(),
       }
-      if (!testDefinitionSchema.safeParse(updated).success)
+      const validation = testDefinitionSchema.safeParse(updated)
+      if (import.meta.env.DEV)
+        console.debug('[TestCatalogueAdmin DEV] Draft validation', {
+          testDefinitionId: id,
+          status: existing.status,
+          payload: input,
+          validation: validation.success
+            ? { success: true }
+            : { success: false, issues: validation.error.issues },
+        })
+      if (!validation.success)
         throw new TestsCatalogueError('TEST_DEFINITION_INVALID')
       await repository.updateDefinition(id, {
         name: updated.name,

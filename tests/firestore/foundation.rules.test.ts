@@ -378,20 +378,29 @@ describe('Security Rules administration Tests PR09', () => {
     await setDoc(reference, definitionData())
     await assertSucceeds(
       updateDoc(reference, {
-        status: 'ACTIVE',
         metrics: [
           {
-            metricKey: 'TIME',
-            label: 'Temps',
+            metricKey: 'HEIGHT',
+            label: 'Hauteur',
             valueType: 'NUMBER',
-            unit: 'SECOND',
-            direction: 'LOWER_IS_BETTER',
+            unit: 'CENTIMETER',
+            direction: 'HIGHER_IS_BETTER',
             required: true,
             minValue: 0,
-            precision: 2,
+            maxValue: 100,
+            precision: 0,
             order: 0,
           },
         ],
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    expect((await getDoc(reference)).data()?.metrics[0]?.metricKey).toBe(
+      'HEIGHT',
+    )
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'ACTIVE',
         updatedAt: serverTimestamp(),
       }),
     )

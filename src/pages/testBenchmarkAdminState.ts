@@ -27,3 +27,19 @@ export const benchmarkCreationErrorMessage = (error: unknown) => {
     return 'Non autorisé : permission tests.manage requise.'
   return 'Erreur Firestore lors de la création du benchmark.'
 }
+
+export const definitionSaveErrorMessage = (error: unknown) => {
+  const code =
+    error instanceof TestsCatalogueError
+      ? error.code
+      : typeof error === 'object' && error !== null && 'code' in error
+        ? String(error.code)
+        : undefined
+  if (code === 'TEST_DEFINITION_INVALID')
+    return 'Brouillon invalide : vérifiez les clés, libellés, unités, bornes et précisions des métriques.'
+  if (code === 'TEST_DEFINITION_IMMUTABLE')
+    return 'Protocole immutable : seules les définitions DRAFT peuvent être modifiées.'
+  if (code === 'PERMISSION_DENIED' || code === 'permission-denied')
+    return 'Non autorisé : permission tests.manage requise.'
+  return 'Erreur Firestore lors de la sauvegarde du brouillon.'
+}

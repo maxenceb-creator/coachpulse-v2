@@ -20,6 +20,7 @@ import { resolveTestDefinitionAdminViewState } from './testDefinitionAdminState'
 import {
   benchmarkCreationErrorMessage,
   benchmarkMetricOptions,
+  definitionSaveErrorMessage,
   hasUnsavedBenchmarkMetrics,
 } from './testBenchmarkAdminState'
 
@@ -454,7 +455,9 @@ export function TestDefinitionAdminPage() {
             </>
           ) : null}
           {mutations.update.isError ? (
-            <p className="error">Brouillon invalide ou immuable.</p>
+            <p className="error">
+              {definitionSaveErrorMessage(mutations.update.error)}
+            </p>
           ) : null}
         </form>
         <section className="card admin-form">

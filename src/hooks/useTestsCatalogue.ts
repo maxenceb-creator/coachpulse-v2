@@ -7,6 +7,7 @@ import type {
 } from '../services/testsCatalogueService'
 import type { TestBenchmark } from '../types/domain'
 import { isTestDefinitionAdminQueryEnabled } from '../pages/testDefinitionAdminState'
+import { canManageTests } from '../services/testsCatalogueService'
 
 export type TestsCatalogueHookContext = CatalogueSecurityContext & {
   securityContextReady: boolean
@@ -130,8 +131,33 @@ export const useTestsCatalogueMutations = (
       onSuccess: (definition) => invalidate(definition.testDefinitionId),
     }),
     update: useMutation({
-      mutationFn: (input: DefinitionDraftInput) =>
-        testsCatalogueService.updateDraft(context, id!, input),
+      mutationFn: async (input: DefinitionDraftInput) => {
+        if (import.meta.env.DEV)
+          console.debug('[TestCatalogueAdmin DEV] Draft save start', {
+            testDefinitionId: id,
+            status: 'DRAFT',
+            payload: input,
+            canManageTests: canManageTests(context.accesses, context),
+            securityContextReady: context.securityContextReady,
+          })
+        try {
+          return await testsCatalogueService.updateDraft(context, id!, input)
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            const failure = error as Error & { code?: string }
+            console.error('[TestCatalogueAdmin DEV] Draft save error', {
+              testDefinitionId: id,
+              status: 'DRAFT',
+              payload: input,
+              code: failure.code ?? 'UNKNOWN',
+              message: failure.message,
+              canManageTests: canManageTests(context.accesses, context),
+              securityContextReady: context.securityContextReady,
+            })
+          }
+          throw error
+        }
+      },
       onSuccess: async (definition) => {
         client.setQueryData(
           queryKeys.tests.definitionAdmin(

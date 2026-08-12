@@ -69,6 +69,34 @@ const defined = (value: object) =>
     Object.entries(value).filter(([, item]) => item !== undefined),
   )
 
+const withoutNestedUndefined = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(withoutNestedUndefined)
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    Object.getPrototypeOf(value) === Object.prototype
+  )
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, item]) => item !== undefined)
+        .map(([key, item]) => [key, withoutNestedUndefined(item)]),
+    )
+  return value
+}
+
+export const definitionUpdatePayload = (
+  value: Partial<TestDefinition>,
+): Partial<TestDefinition> =>
+  withoutNestedUndefined({
+    ...(value.name !== undefined ? { name: value.name } : {}),
+    ...(value.description !== undefined
+      ? { description: value.description }
+      : {}),
+    ...(value.domain !== undefined ? { domain: value.domain } : {}),
+    ...(value.status !== undefined ? { status: value.status } : {}),
+    ...(value.metrics !== undefined ? { metrics: value.metrics } : {}),
+  }) as Partial<TestDefinition>
+
 export const testsCatalogueRepository: TestsCatalogueRepository = {
   listDefinitions: () =>
     many('testDefinitions', testDefinitionSchema, [limit(100)]),
@@ -79,7 +107,7 @@ export const testsCatalogueRepository: TestsCatalogueRepository = {
   },
   updateDefinition: (id, value) =>
     update('testDefinitions', id, {
-      ...defined(value),
+      ...definitionUpdatePayload(value),
       updatedAt: serverTimestamp(),
     }),
   deleteDefinition: (id) => deleteDoc(doc(db, 'testDefinitions', id)),
