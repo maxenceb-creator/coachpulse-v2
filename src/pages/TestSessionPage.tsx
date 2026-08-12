@@ -7,14 +7,7 @@ import {
   useTestSession,
   type TestHookContext,
 } from '../hooks/useTestSession'
-import type { TestDefinition } from '../types/domain'
-
-export const metricColumns = (definition: TestDefinition) =>
-  definition.metrics.map(({ metricKey, label, unit }) => ({
-    key: metricKey,
-    label,
-    unit,
-  }))
+import { metricColumns } from '../services/testEntryColumns'
 
 export function TestSessionPage() {
   const { testSessionId = '' } = useParams()

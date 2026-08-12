@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { metricColumns } from './TestSessionPage'
+import { metricColumns } from '../services/testEntryColumns'
 import type { TestDefinition } from '../types/domain'
 
 describe('table de saisie Tests', () => {
