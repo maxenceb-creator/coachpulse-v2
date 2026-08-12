@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import type { ZodType } from 'zod'
 import { db } from '../config/firebase'
+import { withFirestoreDocumentId } from './firestoreDocumentIds'
 
 type FirestoreFailure = Error & { code?: string }
 
@@ -34,23 +35,12 @@ const withDevFirestoreLog = async <T>(
     throw error
   }
 }
-const ids: Record<string, string> = {
-  users: 'userId',
-  roles: 'roleId',
-  userTeamAccess: 'userTeamAccessId',
-  teams: 'teamId',
-  seasons: 'seasonId',
-  players: 'playerId',
-  playerTeamAssignments: 'assignmentId',
-  testDefinitions: 'testDefinitionId',
-  testBenchmarks: 'testBenchmarkId',
-  testSessions: 'testSessionId',
-  testResults: 'testResultId',
-}
 export async function one<T>(path: string, id: string, s: ZodType<T>) {
   return withDevFirestoreLog(`getDoc ${path}/${id}`, async () => {
     const x = await getDoc(doc(db, path, id))
-    return x.exists() ? s.parse({ ...x.data(), [ids[path]]: x.id }) : null
+    return x.exists()
+      ? s.parse(withFirestoreDocumentId(path, x.id, x.data()))
+      : null
   })
 }
 export async function many<T>(
@@ -61,7 +51,7 @@ export async function many<T>(
   return withDevFirestoreLog(`getDocs ${path}`, async () => {
     const x = await getDocs(query(collection(db, path), ...constraints))
     return x.docs.map((d) =>
-      s.parse({ ...d.data(), [ids[path] ?? 'id']: d.id }),
+      s.parse(withFirestoreDocumentId(path, d.id, d.data())),
     )
   })
 }

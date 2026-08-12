@@ -1249,3 +1249,22 @@ FORWARD
 ```
 
 `ATTACKER` ne doit pas être utilisé comme enum concurrent.
+
+## Addendum PR08 — interprétation des Tests
+
+### BR-370 — Compatibilité analytics
+Définition, version, metricKey et unité doivent être identiques. Toute
+incompatibilité est retournée explicitement.
+
+### BR-371 — Progression directionnelle
+Une hausse améliore `HIGHER_IS_BETTER`; une baisse améliore
+`LOWER_IS_BETTER`. L'égalité exacte est stable, sans tolérance implicite.
+
+### BR-372 — Benchmark directionnel
+Une cible est atteinte par `value >= target` pour `HIGHER_IS_BETTER` et par
+`value <= target` pour `LOWER_IS_BETTER`.
+
+### BR-373 — Statistiques présentes
+Moyenne, médiane, dernier et meilleur utilisent uniquement les valeurs
+présentes. Zéro est une valeur réelle. Un pourcentage relatif après une valeur
+zéro est non applicable.

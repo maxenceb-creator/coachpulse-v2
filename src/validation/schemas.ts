@@ -58,6 +58,23 @@ export const seasonSchema = z.object({
   status: z.enum(['PLANNED', 'ACTIVE', 'CLOSED']),
   isActive: z.boolean(),
 })
+export const categorySchema = z.object({
+  categoryId: z.string(),
+  seasonId: z.string(),
+  name: z.string(),
+  subCategoryIds: z.array(z.string()),
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+  createdAt: date,
+  updatedAt: date,
+})
+export const subCategorySchema = z.object({
+  subCategoryId: z.string(),
+  seasonId: z.string(),
+  name: z.string(),
+  birthYearRule: z.number().int(),
+  createdAt: date,
+  updatedAt: date,
+})
 export const playerSchema = z
   .object({
     playerId: z.string(),

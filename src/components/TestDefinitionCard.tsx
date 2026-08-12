@@ -60,6 +60,12 @@ export function TestDefinitionCard({
         ))}
       </ul>
       <small>Statut : {definition.status}</small>
+      <a
+        className="button-link secondary"
+        href={`/tests/definitions/${definition.testDefinitionId}/analysis`}
+      >
+        Voir l’analyse
+      </a>
       <button
         disabled={disabledReason !== undefined}
         onClick={onCreate}

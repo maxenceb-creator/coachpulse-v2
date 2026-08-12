@@ -1674,3 +1674,20 @@ vérité permanente dans Player.
   confirmée, autorisée en PR07 avec `tests.write` pour `DRAFT` et `COMPLETED`.
   Tous les TestResults liés et la session sont supprimés dans un même batch ;
   une permission dédiée pourra être introduite ultérieurement.
+
+## Addendum PR08 — analytics Tests
+
+- Les analytics Tests sont dérivés à la lecture ; aucune collection de
+  projection n'est ajoutée.
+- L'historique joint les `TestResult` aux `TestSession` afin d'utiliser la date
+  sportive et le contexte Team/Saison/Category figé.
+- Une comparaison exige définition, version, métrique et unité identiques. Une
+  incompatibilité est un état explicite, jamais une conversion silencieuse.
+- Le delta directionnel vaut `current - previous` pour
+  `HIGHER_IS_BETTER`, et son opposé pour `LOWER_IS_BETTER`.
+- Aucun seuil de stabilité ni aucune tolérance arbitraire n'est introduit :
+  l'égalité exacte est `STABLE` / `ON_TARGET`.
+- Le pourcentage relatif n'est pas calculé lorsque la valeur de référence vaut
+  zéro. Moyenne et médiane ignorent les absences et conservent zéro.
+- Le benchmark historique est résolu depuis `Player.birthDate + Season` parmi
+  les sous-catégories de la Category figée par la `TestSession`.
