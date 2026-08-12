@@ -2,9 +2,10 @@ import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../app/AppContext'
 import { usePlayerCount } from '../hooks/usePlayerCount'
 export function DashboardPage() {
-  const { logout } = useAuth(),
+  const { user, logout } = useAuth(),
     c = useApp(),
     count = usePlayerCount(
+      user?.uid,
       c.activeTeamId,
       c.season?.seasonId,
       c.activeRoleId,

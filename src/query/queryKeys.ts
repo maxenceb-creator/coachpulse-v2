@@ -1,0 +1,18 @@
+export const queryKeys = {
+  user: (uid: string) => ['user', uid] as const,
+  roles: (uid: string, roleIds: string[]) =>
+    ['roles', uid, ...[...roleIds].sort()] as const,
+  teamAccess: (uid: string) => ['teamAccess', uid] as const,
+  teams: (uid: string, roleId: string) => ['teams', uid, roleId] as const,
+  season: ['season', 'active'] as const,
+  assignments: (
+    uid: string,
+    roleId: string,
+    teamId: string,
+    seasonId: string,
+  ) => ['assignments', uid, roleId, teamId, seasonId] as const,
+  players: {
+    count: (uid: string, roleId: string, teamId: string, seasonId: string) =>
+      ['players', 'count', uid, roleId, teamId, seasonId] as const,
+  },
+}
