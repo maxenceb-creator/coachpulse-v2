@@ -161,6 +161,25 @@ describe('testsService', () => {
     expect(repository.getActiveDefinitions).toHaveBeenCalledTimes(1)
   })
 
+  it('retourne un tableau vide sans erreur quand aucune TestSession existe', async () => {
+    const repository = repositoryMock()
+    repository.listSessions.mockResolvedValue([])
+    const service = createTestsService(repository)
+
+    await expect(
+      service.listSessions(
+        {
+          userId: 'user',
+          activeRoleId: 'coach',
+          teamId: 'team',
+          accesses,
+        },
+        'season-2026',
+      ),
+    ).resolves.toEqual([])
+    expect(repository.listSessions).toHaveBeenCalledWith('team', 'season-2026')
+  })
+
   it('valide les métriques, la précision, les bornes et conserve zéro', () => {
     expect(validateTestValues({ TIME: 0 }, definition, true)).toEqual({
       TIME: 0,

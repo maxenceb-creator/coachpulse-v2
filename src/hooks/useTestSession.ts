@@ -130,8 +130,47 @@ export const useTestSessions = (context: TestHookContext) =>
       context.teamId,
       context.seasonId,
     ),
-    queryFn: () =>
-      testsService.listSessions(security(context), context.seasonId),
+    queryFn: async () => {
+      const diagnostic = {
+        operation: 'list testSessions',
+        queryConstraints: [
+          ['teamId', '==', context.teamId],
+          ['seasonId', '==', context.seasonId],
+          ['date', 'orderBy', 'desc'],
+          ['limit', 100],
+        ],
+        teamId: context.teamId,
+        seasonId: context.seasonId,
+        roleId: context.roleId,
+        securityContextReady: context.securityContextReady,
+      }
+      if (import.meta.env.DEV) {
+        console.debug('[TestSessions DEV] Requête', diagnostic)
+      }
+      try {
+        const sessions = await testsService.listSessions(
+          security(context),
+          context.seasonId,
+        )
+        if (import.meta.env.DEV) {
+          console.debug('[TestSessions DEV] Succès', {
+            ...diagnostic,
+            resultCount: sessions.length,
+          })
+        }
+        return sessions
+      } catch (error) {
+        const failure = error as Error & { code?: string }
+        if (import.meta.env.DEV) {
+          console.error('[TestSessions DEV] Échec', {
+            ...diagnostic,
+            code: failure.code ?? 'UNKNOWN',
+            message: failure.message,
+          })
+        }
+        throw error
+      }
+    },
     enabled: context.securityContextReady,
   })
 

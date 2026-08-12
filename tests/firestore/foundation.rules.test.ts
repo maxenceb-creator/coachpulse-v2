@@ -6,10 +6,13 @@ import {
 } from '@firebase/rules-unit-testing'
 import {
   collection,
+  deleteDoc,
   doc,
   documentId,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -17,7 +20,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { readFile } from 'node:fs/promises'
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 const projectId = 'demo-coachpulse-v2'
 const seasonId = 'season-active'
@@ -400,6 +403,29 @@ describe('Security Rules TestSession/TestResult PR07', () => {
     await assertFails(
       setDoc(doc(db, 'testSessions/reader-session'), sessionData()),
     )
+  })
+
+  it('autorise la query réelle sur une collection testSessions vide', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const snapshot = await getDocs(
+        collection(context.firestore(), 'testSessions'),
+      )
+      await Promise.all(snapshot.docs.map((item) => deleteDoc(item.ref)))
+    })
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const snapshot = await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testSessions'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          orderBy('date', 'desc'),
+          limit(100),
+        ),
+      ),
+    )
+    expect(snapshot.empty).toBe(true)
+    expect(snapshot.docs).toEqual([])
   })
 
   it('autorise une session du contexte actif et refuse Team, saison ou version incohérente', async () => {
