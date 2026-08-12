@@ -6,7 +6,7 @@ import type {
   DefinitionDraftInput,
 } from '../services/testsCatalogueService'
 import type { TestBenchmark } from '../types/domain'
-import { canManageTests } from '../services/testsCatalogueService'
+import { isTestDefinitionAdminQueryEnabled } from '../pages/testDefinitionAdminState'
 
 export type TestsCatalogueHookContext = CatalogueSecurityContext & {
   securityContextReady: boolean
@@ -20,18 +20,6 @@ const keys = (context: TestsCatalogueHookContext) => ({
     context.seasonId,
   ),
 })
-
-export const isTestDefinitionAdminQueryEnabled = (
-  context: TestsCatalogueHookContext,
-  id: string,
-) =>
-  context.securityContextReady &&
-  !!context.userId &&
-  !!context.activeRoleId &&
-  !!context.teamId &&
-  !!context.seasonId &&
-  !!id &&
-  canManageTests(context.accesses, context)
 
 export const useTestsCatalogue = (context: TestsCatalogueHookContext) =>
   useQuery({

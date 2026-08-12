@@ -1,3 +1,22 @@
+import type { CatalogueSecurityContext } from '../services/testsCatalogueService'
+import { canManageTests } from '../services/testsCatalogueService'
+
+type QueryContext = CatalogueSecurityContext & {
+  securityContextReady: boolean
+}
+
+export const isTestDefinitionAdminQueryEnabled = (
+  context: QueryContext,
+  id: string,
+) =>
+  context.securityContextReady &&
+  !!context.userId &&
+  !!context.activeRoleId &&
+  !!context.teamId &&
+  !!context.seasonId &&
+  !!id &&
+  canManageTests(context.accesses, context)
+
 export type TestDefinitionAdminViewState =
   | 'LOADING_CONTEXT'
   | 'UNAUTHORIZED'

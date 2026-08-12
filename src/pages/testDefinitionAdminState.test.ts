@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamAccess, TestDefinition } from '../types/domain'
-import { isTestDefinitionAdminQueryEnabled } from '../hooks/useTestsCatalogue'
-import { resolveTestDefinitionAdminViewState } from './testDefinitionAdminState'
+import {
+  isTestDefinitionAdminQueryEnabled,
+  resolveTestDefinitionAdminViewState,
+} from './testDefinitionAdminState'
 
 const access: TeamAccess = {
   userTeamAccessId: 'user_team',
