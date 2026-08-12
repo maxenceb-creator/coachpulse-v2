@@ -186,6 +186,43 @@ describe('testsCatalogueService', () => {
     expect(repo.createBenchmark).not.toHaveBeenCalled()
   })
 
+  it('crée U13F / HEIGHT / TARGET / 35 pour une définition DRAFT persistée', async () => {
+    const verticalJump = definition({
+      testDefinitionId: 'test-vertical-jump-v1',
+      metrics: [
+        {
+          ...definition().metrics[0],
+          metricKey: 'HEIGHT',
+          label: 'Hauteur',
+          unit: 'CENTIMETER',
+          direction: 'HIGHER_IS_BETTER',
+          order: 0,
+        },
+      ],
+    })
+    const repo = repository(verticalJump)
+    const service = createTestsCatalogueService(repo)
+
+    const created = await service.createBenchmark(context(), {
+      testDefinitionId: verticalJump.testDefinitionId,
+      testDefinitionVersion: 1,
+      metricKey: 'HEIGHT',
+      subCategoryId: 'u13',
+      seasonId: 'season',
+      benchmarkLevel: 'TARGET',
+      targetValue: 35,
+    })
+
+    expect(created).toMatchObject({
+      status: 'ACTIVE',
+      metricKey: 'HEIGHT',
+      subCategoryId: 'u13',
+      benchmarkLevel: 'TARGET',
+      targetValue: 35,
+    })
+    expect(repo.createBenchmark).toHaveBeenCalledWith(created)
+  })
+
   it('limite la lecture des benchmarks aux sous-catégories de la Category active', async () => {
     const repo = repository()
     const service = createTestsCatalogueService(repo)

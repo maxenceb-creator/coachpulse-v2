@@ -132,7 +132,19 @@ export const useTestsCatalogueMutations = (
     update: useMutation({
       mutationFn: (input: DefinitionDraftInput) =>
         testsCatalogueService.updateDraft(context, id!, input),
-      onSuccess: () => invalidate(id),
+      onSuccess: async (definition) => {
+        client.setQueryData(
+          queryKeys.tests.definitionAdmin(
+            context.userId,
+            context.activeRoleId,
+            context.teamId,
+            context.seasonId,
+            id!,
+          ),
+          { definition },
+        )
+        await invalidate(id)
+      },
     }),
     activate: useMutation({
       mutationFn: () => testsCatalogueService.activate(context, id!),

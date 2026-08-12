@@ -19,6 +19,7 @@ import type {
 import { resolveTestDefinitionAdminViewState } from './testDefinitionAdminState'
 import {
   benchmarkCreationErrorMessage,
+  benchmarkMetricOptions,
   hasUnsavedBenchmarkMetrics,
 } from './testBenchmarkAdminState'
 
@@ -565,7 +566,7 @@ export function TestDefinitionAdminPage() {
                 }
               >
                 <option value="">Choisir</option>
-                {persistedDefinition.metrics.map((metric) => (
+                {benchmarkMetricOptions(definition.metrics).map((metric) => (
                   <option key={metric.metricKey}>{metric.metricKey}</option>
                 ))}
               </select>
@@ -605,9 +606,9 @@ export function TestDefinitionAdminPage() {
             </label>
             <button disabled={benchmarkMetricsAreUnsaved}>Ajouter</button>
             {benchmarkMetricsAreUnsaved ? (
-              <p className="error">
-                Sauvegardez les métriques du brouillon avant de créer un
-                benchmark.
+              <p>
+                La métrique sélectionnée est encore dans le brouillon.
+                Sauvegardez le protocole avant de créer le benchmark.
               </p>
             ) : null}
             {mutations.createBenchmark.isError ? (

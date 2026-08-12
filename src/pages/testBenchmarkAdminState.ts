@@ -6,6 +6,11 @@ export const hasUnsavedBenchmarkMetrics = (
   persisted: TestMetricDefinition[],
 ) => JSON.stringify(displayed) !== JSON.stringify(persisted)
 
+export const benchmarkMetricOptions = (metrics: TestMetricDefinition[]) =>
+  metrics
+    .map((metric, index) => ({ ...metric, order: metric.order ?? index }))
+    .sort((left, right) => left.order - right.order)
+
 export const benchmarkCreationErrorMessage = (error: unknown) => {
   const code =
     error instanceof TestsCatalogueError

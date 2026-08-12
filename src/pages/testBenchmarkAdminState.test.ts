@@ -3,6 +3,7 @@ import { TestsCatalogueError } from '../services/testsCatalogueService'
 import type { TestMetricDefinition } from '../types/domain'
 import {
   benchmarkCreationErrorMessage,
+  benchmarkMetricOptions,
   hasUnsavedBenchmarkMetrics,
 } from './testBenchmarkAdminState'
 
@@ -20,6 +21,18 @@ describe('administration des benchmarks', () => {
   it('détecte une métrique locale non encore persistée', () => {
     expect(hasUnsavedBenchmarkMetrics([metric], [])).toBe(true)
     expect(hasUnsavedBenchmarkMetrics([metric], [metric])).toBe(false)
+  })
+
+  it('propose les métriques d’une définition DRAFT dans leur ordre', () => {
+    const options = benchmarkMetricOptions([
+      { ...metric, metricKey: 'DISTANCE', order: 1 },
+      metric,
+    ])
+
+    expect(options.map(({ metricKey }) => metricKey)).toEqual([
+      'HEIGHT',
+      'DISTANCE',
+    ])
   })
 
   it.each([
