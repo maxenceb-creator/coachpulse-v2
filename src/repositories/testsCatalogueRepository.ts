@@ -36,7 +36,6 @@ export interface TestsCatalogueRepository {
   createDefinition(value: DefinitionWrite): Promise<void>
   updateDefinition(id: string, value: Partial<TestDefinition>): Promise<void>
   deleteDefinition(id: string): Promise<void>
-  isDefinitionUsed(id: string, version: number): Promise<boolean>
   listVersions(code: string): Promise<TestDefinition[]>
   createNextVersion(value: DefinitionWrite): Promise<void>
   listBenchmarks(
@@ -87,17 +86,6 @@ export const testsCatalogueRepository: TestsCatalogueRepository = {
       updatedAt: serverTimestamp(),
     }),
   deleteDefinition: (id) => deleteDoc(doc(db, 'testDefinitions', id)),
-  isDefinitionUsed: async (id, version) => {
-    const snapshot = await getDocs(
-      query(
-        collection(db, 'testSessions'),
-        where('testDefinitionId', '==', id),
-        where('testDefinitionVersion', '==', version),
-        limit(1),
-      ),
-    )
-    return !snapshot.empty
-  },
   listVersions: () =>
     many('testDefinitions', testDefinitionSchema, [limit(100)]),
   createNextVersion: (value) => {

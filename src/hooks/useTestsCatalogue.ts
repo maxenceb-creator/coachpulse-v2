@@ -6,6 +6,7 @@ import type {
   DefinitionDraftInput,
 } from '../services/testsCatalogueService'
 import type { TestBenchmark } from '../types/domain'
+import { canManageTests } from '../services/testsCatalogueService'
 
 export type TestsCatalogueHookContext = CatalogueSecurityContext & {
   securityContextReady: boolean
@@ -20,6 +21,18 @@ const keys = (context: TestsCatalogueHookContext) => ({
   ),
 })
 
+export const isTestDefinitionAdminQueryEnabled = (
+  context: TestsCatalogueHookContext,
+  id: string,
+) =>
+  context.securityContextReady &&
+  !!context.userId &&
+  !!context.activeRoleId &&
+  !!context.teamId &&
+  !!context.seasonId &&
+  !!id &&
+  canManageTests(context.accesses, context)
+
 export const useTestsCatalogue = (context: TestsCatalogueHookContext) =>
   useQuery({
     queryKey: keys(context).catalogue,
@@ -31,6 +44,7 @@ export const useTestDefinitionAdmin = (
   context: TestsCatalogueHookContext,
   id: string,
 ) => {
+  const detailEnabled = isTestDefinitionAdminQueryEnabled(context, id)
   const detail = useQuery({
     queryKey: queryKeys.tests.definitionAdmin(
       context.userId,
@@ -39,8 +53,36 @@ export const useTestDefinitionAdmin = (
       context.seasonId,
       id,
     ),
-    queryFn: () => testsCatalogueService.get(context, id),
-    enabled: context.securityContextReady && !!id,
+    queryFn: async () => {
+      if (import.meta.env.DEV) {
+        console.debug('[TestCatalogueAdmin DEV] Query start', {
+          documentPath: `testDefinitions/${id}`,
+          enabled: detailEnabled,
+        })
+      }
+      try {
+        const result = await testsCatalogueService.get(context, id)
+        if (import.meta.env.DEV) {
+          console.debug('[TestCatalogueAdmin DEV] Query success', {
+            found: true,
+            definitionId: result.definition.testDefinitionId,
+            version: result.definition.version,
+            status: result.definition.status,
+          })
+        }
+        return result
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          const failure = error as Error & { code?: string }
+          console.error('[TestCatalogueAdmin DEV] Query error', {
+            code: failure.code ?? 'UNKNOWN',
+            message: failure.message,
+          })
+        }
+        throw error
+      }
+    },
+    enabled: detailEnabled,
   })
   const benchmarks = useQuery({
     queryKey: queryKeys.tests.benchmarksAdmin(
@@ -62,7 +104,7 @@ export const useTestDefinitionAdmin = (
   const subCategories = useQuery({
     queryKey: [...keys(context).catalogue, 'subCategories'],
     queryFn: () => testsCatalogueService.subCategories(context),
-    enabled: context.securityContextReady,
+    enabled: detailEnabled && !!context.categoryId,
   })
   return { detail, benchmarks, subCategories }
 }

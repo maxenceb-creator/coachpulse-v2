@@ -20,7 +20,7 @@ export function TestsCataloguePage() {
     seasonId: app.season?.seasonId ?? '',
     categoryId: team?.categoryId ?? '',
     accesses: app.accesses,
-    securityContextReady: app.securityContextReady && !!team?.categoryId,
+    securityContextReady: app.securityContextReady,
   }
   const allowed = canManageTests(app.accesses, context)
   const catalogue = useTestsCatalogue(context)

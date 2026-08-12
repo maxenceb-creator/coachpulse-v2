@@ -9,12 +9,14 @@ import {
 import {
   canManageTests,
   sortTestMetrics,
+  TestsCatalogueError,
 } from '../services/testsCatalogueService'
 import type {
   TestBenchmark,
   TestDefinition,
   TestMetricDefinition,
 } from '../types/domain'
+import { resolveTestDefinitionAdminViewState } from './testDefinitionAdminState'
 
 function BenchmarkRow({
   item,
@@ -84,7 +86,7 @@ export function TestDefinitionAdminPage() {
     seasonId: app.season?.seasonId ?? '',
     categoryId: team?.categoryId ?? '',
     accesses: app.accesses,
-    securityContextReady: app.securityContextReady && !!team?.categoryId,
+    securityContextReady: app.securityContextReady,
   }
   const allowed = canManageTests(app.accesses, context)
   const { detail, benchmarks, subCategories } = useTestDefinitionAdmin(
@@ -107,19 +109,65 @@ export function TestDefinitionAdminPage() {
       })
   }, [detail.data])
 
-  if (!allowed)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.debug('[TestCatalogueAdmin DEV] Route', {
+      testDefinitionId,
+      uid: context.userId,
+      roleId: context.activeRoleId,
+      securityContextReady: context.securityContextReady,
+      canManageTests: allowed,
+    })
+  }, [
+    testDefinitionId,
+    context.userId,
+    context.activeRoleId,
+    context.securityContextReady,
+    allowed,
+  ])
+
+  const viewState = resolveTestDefinitionAdminViewState({
+    appLoading: app.loading,
+    securityContextReady: context.securityContextReady,
+    allowed,
+    testDefinitionId,
+    queryPending: detail.isPending,
+    queryError: detail.isError,
+    errorCode:
+      detail.error instanceof TestsCatalogueError
+        ? detail.error.code
+        : undefined,
+    hasData: !!detail.data,
+  })
+
+  if (viewState === 'LOADING_CONTEXT')
+    return <main className="center">Chargement du contexte…</main>
+  if (viewState === 'UNAUTHORIZED')
     return (
-      <main className="center error">Permission tests.manage requise.</main>
+      <main className="center error">
+        Non autorisé : permission tests.manage requise.
+      </main>
     )
-  if (detail.isLoading || !draft)
-    return <main className="center">Chargement du protocole…</main>
-  if (detail.isError)
+  if (viewState === 'NOT_FOUND')
     return <main className="center error">Protocole introuvable.</main>
-  const editable = draft.status === 'DRAFT' && !detail.data?.used
+  if (viewState === 'LOADING')
+    return <main className="center">Chargement du protocole…</main>
+  if (viewState === 'ERROR')
+    return (
+      <main className="center error">Impossible de charger le protocole.</main>
+    )
+  if (!detail.data) return null
+  const definition =
+    draft ??
+    ({
+      ...detail.data.definition,
+      metrics: sortTestMetrics(detail.data.definition.metrics),
+    } satisfies TestDefinition)
+  const editable = definition.status === 'DRAFT'
   const changeMetric = (index: number, patch: Partial<TestMetricDefinition>) =>
     setDraft({
-      ...draft,
-      metrics: draft.metrics.map((metric, i) =>
+      ...definition,
+      metrics: definition.metrics.map((metric, i) =>
         i === index ? { ...metric, ...patch } : metric,
       ),
     })
@@ -130,7 +178,7 @@ export function TestDefinitionAdminPage() {
         <div>
           <p className="eyebrow">TESTS · ADMINISTRATION</p>
           <strong>
-            {draft.name} v{draft.version}
+            {definition.name} v{definition.version}
           </strong>
         </div>
         <Link className="button-link secondary" to="/tests/admin">
@@ -139,22 +187,24 @@ export function TestDefinitionAdminPage() {
       </header>
       <main className="dashboard">
         <h1>
-          {draft.name} <small>v{draft.version}</small>
+          {definition.name} <small>v{definition.version}</small>
         </h1>
         <p>
-          Statut : <strong>{draft.status}</strong>
-          {detail.data?.used ? ' · utilisée dans une session' : ''}
+          Statut : <strong>{definition.status}</strong>
+          {definition.status !== 'DRAFT'
+            ? ' · version publiée et immuable'
+            : ''}
         </p>
         <form
           className="card admin-form"
           onSubmit={(event) => {
             event.preventDefault()
             mutations.update.mutate({
-              name: draft.name,
-              code: draft.code,
-              description: draft.description,
-              domain: draft.domain,
-              metrics: draft.metrics,
+              name: definition.name,
+              code: definition.code,
+              description: definition.description,
+              domain: definition.domain,
+              metrics: definition.metrics,
             })
           }}
         >
@@ -163,23 +213,23 @@ export function TestDefinitionAdminPage() {
             Nom
             <input
               disabled={!editable}
-              value={draft.name}
+              value={definition.name}
               onChange={(event) =>
-                setDraft({ ...draft, name: event.target.value })
+                setDraft({ ...definition, name: event.target.value })
               }
             />
           </label>
           <label>
             Code
-            <input disabled value={draft.code} />
+            <input disabled value={definition.code} />
           </label>
           <label>
             Description
             <textarea
               disabled={!editable}
-              value={draft.description ?? ''}
+              value={definition.description ?? ''}
               onChange={(event) =>
-                setDraft({ ...draft, description: event.target.value })
+                setDraft({ ...definition, description: event.target.value })
               }
             />
           </label>
@@ -187,10 +237,10 @@ export function TestDefinitionAdminPage() {
             Type
             <select
               disabled={!editable}
-              value={draft.domain}
+              value={definition.domain}
               onChange={(event) =>
                 setDraft({
-                  ...draft,
+                  ...definition,
                   domain: event.target.value as TestDefinition['domain'],
                 })
               }
@@ -200,7 +250,7 @@ export function TestDefinitionAdminPage() {
             </select>
           </label>
           <div className="metric-editor">
-            {draft.metrics.map((metric, index) => (
+            {definition.metrics.map((metric, index) => (
               <fieldset key={`${index}-${metric.metricKey}`}>
                 <legend>Métrique {index + 1}</legend>
                 <label>
@@ -335,8 +385,8 @@ export function TestDefinitionAdminPage() {
                       disabled={index === 0}
                       onClick={() =>
                         setDraft({
-                          ...draft,
-                          metrics: draft.metrics
+                          ...definition,
+                          metrics: definition.metrics
                             .map((item, i) => ({
                               ...item,
                               order:
@@ -357,8 +407,8 @@ export function TestDefinitionAdminPage() {
                       className="secondary"
                       onClick={() =>
                         setDraft({
-                          ...draft,
-                          metrics: draft.metrics
+                          ...definition,
+                          metrics: definition.metrics
                             .filter((_, i) => i !== index)
                             .map((item, i) => ({ ...item, order: i })),
                         })
@@ -378,10 +428,10 @@ export function TestDefinitionAdminPage() {
                 className="secondary"
                 onClick={() =>
                   setDraft({
-                    ...draft,
+                    ...definition,
                     metrics: [
-                      ...draft.metrics,
-                      emptyMetric(draft.metrics.length),
+                      ...definition.metrics,
+                      emptyMetric(definition.metrics.length),
                     ],
                   })
                 }
@@ -400,9 +450,9 @@ export function TestDefinitionAdminPage() {
         <section className="card admin-form">
           <h2>Prévisualisation</h2>
           <h3>
-            {draft.name} v{draft.version}
+            {definition.name} v{definition.version}
           </h3>
-          {sortTestMetrics(draft.metrics).map((metric) => (
+          {sortTestMetrics(definition.metrics).map((metric) => (
             <p key={metric.metricKey}>
               {metric.label || metric.metricKey} | {metric.unit}
             </p>
@@ -423,7 +473,7 @@ export function TestDefinitionAdminPage() {
           >
             Créer une nouvelle version
           </button>
-          {draft.status !== 'ARCHIVED' ? (
+          {definition.status !== 'ARCHIVED' ? (
             <button
               className="secondary"
               onClick={() => mutations.archive.mutate()}
@@ -451,8 +501,8 @@ export function TestDefinitionAdminPage() {
             onSubmit={(event) => {
               event.preventDefault()
               mutations.createBenchmark.mutate({
-                testDefinitionId: draft.testDefinitionId,
-                testDefinitionVersion: draft.version,
+                testDefinitionId: definition.testDefinitionId,
+                testDefinitionVersion: definition.version,
                 seasonId: context.seasonId,
                 subCategoryId: benchmark.subCategoryId,
                 metricKey: benchmark.metricKey,
@@ -491,7 +541,7 @@ export function TestDefinitionAdminPage() {
                 }
               >
                 <option value="">Choisir</option>
-                {draft.metrics.map((metric) => (
+                {definition.metrics.map((metric) => (
                   <option key={metric.metricKey}>{metric.metricKey}</option>
                 ))}
               </select>

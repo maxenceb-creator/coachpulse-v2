@@ -125,10 +125,7 @@ export const createTestsCatalogueService = (
       const definition = await repository.getDefinition(id)
       if (!definition)
         throw new TestsCatalogueError('TEST_DEFINITION_NOT_FOUND')
-      return {
-        definition,
-        used: await repository.isDefinitionUsed(id, definition.version),
-      }
+      return { definition }
     },
     async create(
       context: CatalogueSecurityContext,
@@ -171,10 +168,7 @@ export const createTestsCatalogueService = (
       requireManage(context)
       const existing = await repository.getDefinition(id)
       if (!existing) throw new TestsCatalogueError('TEST_DEFINITION_NOT_FOUND')
-      if (
-        existing.status !== 'DRAFT' ||
-        (await repository.isDefinitionUsed(id, existing.version))
-      )
+      if (existing.status !== 'DRAFT')
         throw new TestsCatalogueError('TEST_DEFINITION_IMMUTABLE')
       if (input.code.trim().toUpperCase() !== existing.code)
         throw new TestsCatalogueError('TEST_DEFINITION_IMMUTABLE')
@@ -251,10 +245,7 @@ export const createTestsCatalogueService = (
       requireManage(context)
       const existing = await repository.getDefinition(id)
       if (!existing) throw new TestsCatalogueError('TEST_DEFINITION_NOT_FOUND')
-      if (
-        existing.status !== 'DRAFT' ||
-        (await repository.isDefinitionUsed(id, existing.version))
-      )
+      if (existing.status !== 'DRAFT')
         throw new TestsCatalogueError('TEST_DEFINITION_USED')
       await repository.deleteDefinition(id)
     },

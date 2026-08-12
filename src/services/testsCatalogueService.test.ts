@@ -66,7 +66,6 @@ const repository = (existing = definition()): TestsCatalogueRepository => ({
   createDefinition: vi.fn(async () => undefined),
   updateDefinition: vi.fn(async () => undefined),
   deleteDefinition: vi.fn(async () => undefined),
-  isDefinitionUsed: vi.fn(async () => false),
   listVersions: vi.fn(async () => [existing]),
   createNextVersion: vi.fn(async () => undefined),
   listBenchmarks: vi.fn(async () => []),
@@ -120,7 +119,6 @@ describe('testsCatalogueService', () => {
 
   it('interdit la mutation structurelle et la suppression d’une version utilisée', async () => {
     const repo = repository(definition({ status: 'ACTIVE' }))
-    vi.mocked(repo.isDefinitionUsed).mockResolvedValue(true)
     const service = createTestsCatalogueService(repo)
     await expect(
       service.updateDraft(context(), 'test-generic-v1', definition()),

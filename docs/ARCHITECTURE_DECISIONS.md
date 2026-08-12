@@ -1701,8 +1701,13 @@ vérité permanente dans Player.
 - Chaque version est un document immutable distinct. Son ID déterministe suit
   `test-{code normalisé}-v{version}`. La création transactionnelle échoue si le
   document cible existe déjà, ce qui arbitre deux créations concurrentes.
-- La détection d'usage interroge `testSessions` par définition/version avec
-  `limit(1)` ; aucune session complète n'est chargée.
+- Le client n'effectue pas de requête globale `testSessions` pour déterminer
+  l'usage d'une définition : les Rules de sessions imposent Team et saison, et
+  une telle requête globale serait à la fois non prouvable et incomplète. La
+  sécurité repose sur le cycle : une session ne peut référencer qu'une version
+  `ACTIVE`, tandis que seule une version `DRAFT` est modifiable ou supprimable.
+  Dès activation, la version devient historiquement protégée, qu'une session
+  existe déjà ou non.
 - L'unicité benchmark est matérialisée par un ID déterministe construit depuis
   saison, sous-catégorie, définition/version, métrique et niveau.
 - PR07 et PR08 consomment toujours les métriques génériques, triées par `order` ;
