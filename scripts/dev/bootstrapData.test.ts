@@ -94,6 +94,46 @@ describe('DEV bootstrap data', () => {
     )
   })
 
+  it('relie U13F et U14F à leurs sous-catégories canoniques de saison', () => {
+    const categoryById = new Map(
+      dataset.categories.map((category) => [category.categoryId, category]),
+    )
+    const subCategoryById = new Map(
+      dataset.subCategories.map((subCategory) => [
+        subCategory.subCategoryId,
+        subCategory,
+      ]),
+    )
+
+    expect(
+      dataset.teams
+        .filter(({ teamId }) =>
+          ['team-dev-u13f', 'team-dev-u14f'].includes(teamId),
+        )
+        .map((team) => {
+          const category = categoryById.get(team.categoryId!)!
+          return {
+            teamId: team.teamId,
+            seasonId: category.seasonId,
+            subCategories: category.subCategoryIds.map(
+              (id) => subCategoryById.get(id)!.name,
+            ),
+          }
+        }),
+    ).toEqual([
+      {
+        teamId: 'team-dev-u13f',
+        seasonId: 'season-2026-2027',
+        subCategories: ['U13F'],
+      },
+      {
+        teamId: 'team-dev-u14f',
+        seasonId: 'season-2026-2027',
+        subCategories: ['U14F'],
+      },
+    ])
+  })
+
   it('crée les protocoles et benchmarks Tests DEV déterministes', () => {
     expect(dataset.testDefinitions.map(({ code }) => code)).toEqual([
       'JUGGLING',

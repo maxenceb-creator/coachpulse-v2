@@ -1,10 +1,7 @@
 import {
-  collection,
   deleteDoc,
   doc,
-  getDocs,
   limit,
-  query,
   runTransaction,
   serverTimestamp,
   where,
@@ -23,7 +20,6 @@ import {
   categorySchema,
 } from '../validation/schemas'
 import { many, one, update } from './firestoreRepository'
-import { withFirestoreDocumentId } from './firestoreDocumentIds'
 
 export type DefinitionWrite = Omit<
   TestDefinition,
@@ -111,20 +107,13 @@ export const testsCatalogueRepository: TestsCatalogueRepository = {
     }),
   listSubCategories: async (seasonId, ids) => {
     if (!ids.length) return []
-    const snapshot = await getDocs(
-      query(
-        collection(db, 'subCategories'),
-        where('seasonId', '==', seasonId),
-        limit(100),
-      ),
+    const subCategories = await Promise.all(
+      ids.map((id) => one('subCategories', id, subCategorySchema)),
     )
-    return snapshot.docs
-      .filter((item) => ids.includes(item.id))
-      .map((item) =>
-        subCategorySchema.parse(
-          withFirestoreDocumentId('subCategories', item.id, item.data()),
-        ),
-      )
+    return subCategories.filter(
+      (item): item is SubCategory =>
+        item !== null && item.seasonId === seasonId,
+    )
   },
   getCategory: (id) => one('categories', id, categorySchema),
 }

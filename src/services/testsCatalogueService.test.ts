@@ -168,6 +168,70 @@ describe('testsCatalogueService', () => {
     ).rejects.toMatchObject({ code: 'BENCHMARK_DUPLICATE' })
   })
 
+  it('charge les sous-catégories canoniques de la Category et de la saison', async () => {
+    const repo = repository()
+    vi.mocked(repo.getCategory).mockResolvedValue({
+      categoryId: 'category',
+      seasonId: 'season',
+      name: 'Formation',
+      subCategoryIds: ['subcat-u14-2026', 'subcat-u13-2026'],
+      status: 'ACTIVE',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    vi.mocked(repo.listSubCategories).mockResolvedValue([
+      {
+        subCategoryId: 'subcat-u14-2026',
+        seasonId: 'season',
+        name: 'U14F',
+        birthYearRule: 2013,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        subCategoryId: 'subcat-u13-2026',
+        seasonId: 'season',
+        name: 'U13F',
+        birthYearRule: 2014,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ])
+
+    const result =
+      await createTestsCatalogueService(repo).subCategories(context())
+
+    expect(repo.listSubCategories).toHaveBeenCalledWith('season', [
+      'subcat-u14-2026',
+      'subcat-u13-2026',
+    ])
+    expect(result.map(({ subCategoryId }) => subCategoryId)).toEqual([
+      'subcat-u13-2026',
+      'subcat-u14-2026',
+    ])
+  })
+
+  it('autorise des TARGET U13 et U14 distincts pour la même métrique', () => {
+    const base = {
+      seasonId: 'season-2026',
+      testDefinitionId: 'test-vertical-jump-v1',
+      testDefinitionVersion: 1,
+      metricKey: 'HEIGHT',
+      benchmarkLevel: 'TARGET' as const,
+    }
+    expect(
+      benchmarkDocumentId({
+        ...base,
+        subCategoryId: 'subcat-u13-2026',
+      }),
+    ).not.toBe(
+      benchmarkDocumentId({
+        ...base,
+        subCategoryId: 'subcat-u14-2026',
+      }),
+    )
+  })
+
   it('alimente PR07 et PR08 avec un protocole générique sans branche spécifique', () => {
     const generic = definition({ status: 'ACTIVE' })
     const benchmark = (targetValue: number) => ({

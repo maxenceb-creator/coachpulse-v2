@@ -515,6 +515,7 @@ export function TestDefinitionAdminPage() {
               Sous-catégorie
               <select
                 required
+                disabled={subCategories.isPending || subCategories.isError}
                 value={benchmark.subCategoryId}
                 onChange={(event) =>
                   setBenchmark({
@@ -530,6 +531,20 @@ export function TestDefinitionAdminPage() {
                   </option>
                 ))}
               </select>
+              {subCategories.isPending ? (
+                <small>Chargement des sous-catégories…</small>
+              ) : null}
+              {subCategories.isError ? (
+                <small className="error">
+                  Impossible de charger les sous-catégories du contexte actif.
+                </small>
+              ) : null}
+              {subCategories.isSuccess && !subCategories.data.length ? (
+                <small className="error">
+                  Aucune sous-catégorie disponible pour cette Team et cette
+                  saison.
+                </small>
+              ) : null}
             </label>
             <label>
               Métrique

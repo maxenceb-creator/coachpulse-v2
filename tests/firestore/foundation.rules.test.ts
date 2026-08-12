@@ -298,6 +298,8 @@ describe('Security Rules du domaine Tests PR06', () => {
     const db = testEnv.authenticatedContext('user-a').firestore()
     await assertSucceeds(getDoc(doc(db, 'testDefinitions/juggling-v1')))
     await assertSucceeds(getDoc(doc(db, 'testBenchmarks/benchmark-a')))
+    await assertSucceeds(getDoc(doc(db, 'subCategories/subcat-a')))
+    await assertFails(getDoc(doc(db, 'subCategories/subcat-b')))
     await assertSucceeds(
       getDocs(
         query(

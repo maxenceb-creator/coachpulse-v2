@@ -348,10 +348,12 @@ export const createTestsCatalogueService = (
     },
     async subCategories(context: CatalogueSecurityContext) {
       requireManage(context)
-      return repository.listSubCategories(
-        context.seasonId,
-        await allowedSubCategoryIds(context),
-      )
+      return (
+        await repository.listSubCategories(
+          context.seasonId,
+          await allowedSubCategoryIds(context),
+        )
+      ).sort((left, right) => left.name.localeCompare(right.name))
     },
   }
 }
