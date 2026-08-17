@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
-import { invalidateTestPlayerHistory } from '../query/testPlayerHistoryCache'
+import {
+  invalidateTestPlayerHistory,
+  updateTestPlayerHistoryBenchmark,
+} from '../query/testPlayerHistoryCache'
 import { testsCatalogueService } from '../services/appTestsService'
 import type {
   CatalogueSecurityContext,
@@ -394,6 +397,18 @@ export const useTestsCatalogueMutations = (
           created.testBenchmarkId,
           'cache update',
         )
+        updateTestPlayerHistoryBenchmark(
+          client,
+          {
+            uid: context.userId,
+            roleId: context.activeRoleId,
+            teamId: context.teamId,
+            seasonId: context.seasonId,
+          },
+          'create',
+          created.testBenchmarkId,
+          created,
+        )
         reconcileBenchmarkQueries('create', created.testBenchmarkId)
       },
       onSettled: (created, _error, input) =>
@@ -418,6 +433,18 @@ export const useTestsCatalogueMutations = (
           'archive',
           archived.testBenchmarkId,
           'cache update',
+        )
+        updateTestPlayerHistoryBenchmark(
+          client,
+          {
+            uid: context.userId,
+            roleId: context.activeRoleId,
+            teamId: context.teamId,
+            seasonId: context.seasonId,
+          },
+          'archive',
+          archived.testBenchmarkId,
+          archived,
         )
         reconcileBenchmarkQueries('archive', archived.testBenchmarkId)
       },
@@ -447,6 +474,18 @@ export const useTestsCatalogueMutations = (
           updated.testBenchmarkId,
           'cache update',
         )
+        updateTestPlayerHistoryBenchmark(
+          client,
+          {
+            uid: context.userId,
+            roleId: context.activeRoleId,
+            teamId: context.teamId,
+            seasonId: context.seasonId,
+          },
+          'update',
+          updated.testBenchmarkId,
+          updated,
+        )
         reconcileBenchmarkQueries('update', updated.testBenchmarkId)
       },
       onSettled: (_updated, _error, input) =>
@@ -468,6 +507,17 @@ export const useTestsCatalogueMutations = (
           ),
         )
         logBenchmarkMutationStep('delete', benchmarkId, 'cache update')
+        updateTestPlayerHistoryBenchmark(
+          client,
+          {
+            uid: context.userId,
+            roleId: context.activeRoleId,
+            teamId: context.teamId,
+            seasonId: context.seasonId,
+          },
+          'delete',
+          benchmarkId,
+        )
         reconcileBenchmarkQueries('delete', benchmarkId)
       },
       onSettled: (_deleted, _error, benchmarkId) =>

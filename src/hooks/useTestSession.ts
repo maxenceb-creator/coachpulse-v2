@@ -1,11 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
-import { invalidateTestPlayerHistory } from '../query/testPlayerHistoryCache'
+import {
+  completeTestPlayerHistorySession,
+  invalidateTestPlayerHistory,
+  removeTestPlayerHistorySession,
+  updateTestPlayerHistoryResults,
+} from '../query/testPlayerHistoryCache'
 import { testsService } from '../services/appTestsService'
 import type {
   Player,
   TeamAccess,
   TestDefinition,
+  TestResult,
   TestSession,
 } from '../types/domain'
 import { hasPermission } from '../services/permissionsService'
@@ -25,6 +31,17 @@ const security = (context: TestHookContext) => ({
   teamId: context.teamId,
   accesses: context.accesses,
 })
+
+const reconcileQueries = (invalidations: Promise<unknown>[]) => {
+  void Promise.all(invalidations).catch((error: unknown) => {
+    if (!import.meta.env.DEV) return
+    const failure = error as Error & { code?: string }
+    console.error('[TestCache DEV] Réconciliation échouée', {
+      code: failure.code ?? 'UNKNOWN',
+      message: failure.message,
+    })
+  })
+}
 
 export const useTestSession = (context: TestHookContext, id: string) => {
   const enabled =
@@ -107,16 +124,55 @@ export const useSaveTestResults = (context: TestHookContext) => {
         input.drafts,
         input.complete,
       ),
-    onSuccess: async (savedResults, input) => {
-      const invalidations: Promise<unknown>[] = [
-        client.invalidateQueries({
-          queryKey: queryKeys.tests.results(
+    onSuccess: (savedResults, input) => {
+      const completedSession: TestSession = input.complete
+        ? { ...input.session, status: 'COMPLETED', updatedAt: new Date() }
+        : input.session
+      const sessionKey = queryKeys.tests.session(
+        context.uid,
+        context.roleId,
+        context.teamId,
+        context.seasonId,
+        input.session.testSessionId,
+      )
+      const resultsKey = queryKeys.tests.results(
+        context.uid,
+        context.roleId,
+        context.teamId,
+        context.seasonId,
+        input.session.testSessionId,
+      )
+      client.setQueryData<TestResult[]>(resultsKey, (current = []) => {
+        const savedIds = new Set(
+          savedResults.map(({ testResultId }) => testResultId),
+        )
+        return [
+          ...current.filter(({ testResultId }) => !savedIds.has(testResultId)),
+          ...savedResults,
+        ]
+      })
+      updateTestPlayerHistoryResults(client, context, savedResults)
+      if (input.complete) {
+        client.setQueryData(sessionKey, completedSession)
+        client.setQueryData<TestSession[]>(
+          queryKeys.tests.sessions(
             context.uid,
             context.roleId,
             context.teamId,
             context.seasonId,
-            input.session.testSessionId,
           ),
+          (current) =>
+            current?.map((session) =>
+              session.testSessionId === completedSession.testSessionId
+                ? completedSession
+                : session,
+            ),
+        )
+        completeTestPlayerHistorySession(client, context, completedSession)
+      }
+      const invalidations: Promise<unknown>[] = [
+        client.invalidateQueries({
+          queryKey: resultsKey,
         }),
         client.invalidateQueries({
           queryKey: queryKeys.tests.analysisRoot(
@@ -134,16 +190,18 @@ export const useSaveTestResults = (context: TestHookContext) => {
       if (input.complete)
         invalidations.push(
           client.invalidateQueries({
-            queryKey: queryKeys.tests.session(
+            queryKey: sessionKey,
+          }),
+          client.invalidateQueries({
+            queryKey: queryKeys.tests.sessions(
               context.uid,
               context.roleId,
               context.teamId,
               context.seasonId,
-              input.session.testSessionId,
             ),
           }),
         )
-      await Promise.all(invalidations)
+      reconcileQueries(invalidations)
     },
   })
 }
@@ -222,8 +280,32 @@ export const useCreateTestSession = (context: TestHookContext) => {
         teamId: context.teamId,
         seasonId: context.seasonId,
       }),
-    onSuccess: async () => {
-      await Promise.all([
+    onSuccess: (session) => {
+      client.setQueryData<TestSession[]>(
+        queryKeys.tests.sessions(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+        ),
+        (current = []) => [
+          session,
+          ...current.filter(
+            ({ testSessionId }) => testSessionId !== session.testSessionId,
+          ),
+        ],
+      )
+      client.setQueryData(
+        queryKeys.tests.session(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+          session.testSessionId,
+        ),
+        session,
+      )
+      reconcileQueries([
         client.invalidateQueries({
           queryKey: queryKeys.tests.sessions(
             context.uid,
@@ -253,7 +335,7 @@ export const useDeleteTestSession = (context: TestHookContext) => {
         testSessionId,
         context.seasonId,
       ),
-    onSuccess: async (deleted) => {
+    onSuccess: (deleted) => {
       client.setQueryData<TestSession[]>(sessionsKey, (sessions = []) =>
         sessions.filter(
           ({ testSessionId }) => testSessionId !== deleted.testSessionId,
@@ -279,7 +361,8 @@ export const useDeleteTestSession = (context: TestHookContext) => {
         ),
         exact: true,
       })
-      await Promise.all([
+      removeTestPlayerHistorySession(client, context, deleted.testSessionId)
+      reconcileQueries([
         client.invalidateQueries({ queryKey: sessionsKey, exact: true }),
         client.invalidateQueries({
           queryKey: queryKeys.tests.analysisRoot(

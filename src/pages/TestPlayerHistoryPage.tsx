@@ -10,16 +10,12 @@ import {
 } from '../hooks/useTestPlayerHistory'
 import type { TestHookContext } from '../hooks/useTestSession'
 import type { TestMetricDefinition } from '../types/domain'
+import { formatSignedTestValue } from '../services/testHistoryFormatting'
 
 const format = (value: number | undefined, metric: TestMetricDefinition) =>
   value === undefined
     ? '—'
     : `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value)} ${metric.unit}`
-
-const signed = (value: number | undefined, suffix = '') =>
-  value === undefined
-    ? '—'
-    : `${value > 0 ? '+' : ''}${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value)}${suffix}`
 
 export function TestPlayerHistoryPage() {
   const { playerId = '' } = useParams()
@@ -189,7 +185,7 @@ export function TestPlayerHistoryPage() {
                         <div>
                           <dt>Évolution</dt>
                           <dd>
-                            {signed(
+                            {formatSignedTestValue(
                               summary.evolution?.delta,
                               ` ${summary.metric.unit}`,
                             )}
@@ -198,7 +194,7 @@ export function TestPlayerHistoryPage() {
                         <div>
                           <dt>Progression</dt>
                           <dd>
-                            {signed(
+                            {formatSignedTestValue(
                               summary.evolution?.performanceRelativeChange,
                               ' %',
                             )}
@@ -219,7 +215,7 @@ export function TestPlayerHistoryPage() {
                             Objectif {benchmark.benchmarkLevel} :{' '}
                             {format(benchmark.targetValue, summary.metric)}
                             {comparison?.directionalDelta !== undefined
-                              ? ` · ${signed(comparison.directionalDelta, ` ${summary.metric.unit}`)}`
+                              ? ` · ${formatSignedTestValue(comparison.directionalDelta, ` ${summary.metric.unit}`)}`
                               : ''}
                           </p>
                         ))

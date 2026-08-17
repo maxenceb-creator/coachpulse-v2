@@ -76,6 +76,7 @@ export const useTestPlayerHistory = (
           queryKey,
           queryFn: load,
           staleTime,
+          revalidateIfStale: true,
         })
         timings[`${name}Ms`] = performance.now() - start
         return data
