@@ -421,13 +421,13 @@ describe('Security Rules administration Tests PR09', () => {
   it('réserve les benchmarks au manager et au contexte de sous-catégorie actif', async () => {
     const db = testEnv.authenticatedContext('user-a').firestore()
     const data = {
-      testDefinitionId: 'juggling-v1',
+      testDefinitionId: 'test-vertical-jump-v1',
       testDefinitionVersion: 1,
-      metricKey: 'STRONG_FOOT',
+      metricKey: 'HEIGHT',
       subCategoryId: 'subcat-a',
       seasonId,
       benchmarkLevel: 'TARGET',
-      targetValue: 0,
+      targetValue: 35,
       status: 'ACTIVE',
       createdBy: 'user-a',
       createdAt: serverTimestamp(),
@@ -437,6 +437,29 @@ describe('Security Rules administration Tests PR09', () => {
     await updateDoc(doc(db, 'users/user-a'), {
       securityContext: securityContext('manager'),
     })
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'testDefinitions/test-vertical-jump-v1'),
+        definitionData({
+          name: 'Détente verticale',
+          code: 'VERTICAL_JUMP',
+          metrics: [
+            {
+              metricKey: 'HEIGHT',
+              label: 'Hauteur',
+              valueType: 'NUMBER',
+              unit: 'CENTIMETER',
+              direction: 'HIGHER_IS_BETTER',
+              precision: 0,
+              minValue: 0,
+              maxValue: 100,
+              required: true,
+              order: 0,
+            },
+          ],
+        }),
+      ),
+    )
     await assertSucceeds(setDoc(doc(db, 'testBenchmarks/new-target'), data))
     await assertSucceeds(
       updateDoc(doc(db, 'testBenchmarks/new-target'), {
@@ -448,7 +471,7 @@ describe('Security Rules administration Tests PR09', () => {
       getDocs(
         query(
           collection(db, 'testBenchmarks'),
-          where('testDefinitionId', '==', 'juggling-v1'),
+          where('testDefinitionId', '==', 'test-vertical-jump-v1'),
           where('testDefinitionVersion', '==', 1),
           where('seasonId', '==', seasonId),
           where('subCategoryId', '==', 'subcat-a'),
@@ -464,7 +487,7 @@ describe('Security Rules administration Tests PR09', () => {
       getDocs(
         query(
           collection(db, 'testBenchmarks'),
-          where('testDefinitionId', '==', 'juggling-v1'),
+          where('testDefinitionId', '==', 'test-vertical-jump-v1'),
           where('testDefinitionVersion', '==', 1),
           where('seasonId', '==', seasonId),
         ),
@@ -476,6 +499,8 @@ describe('Security Rules administration Tests PR09', () => {
         subCategoryId: 'subcat-b',
       }),
     )
+    const forged = testEnv.authenticatedContext('user-forged-role').firestore()
+    await assertFails(setDoc(doc(forged, 'testBenchmarks/forged-target'), data))
   })
 
   it('refuse utilisateur désactivé et rôle falsifié', async () => {

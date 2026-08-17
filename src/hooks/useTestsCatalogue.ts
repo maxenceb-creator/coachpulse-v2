@@ -7,7 +7,10 @@ import type {
 } from '../services/testsCatalogueService'
 import type { TestBenchmark } from '../types/domain'
 import { isTestDefinitionAdminQueryEnabled } from '../pages/testDefinitionAdminState'
-import { canManageTests } from '../services/testsCatalogueService'
+import {
+  canManageTests,
+  TestsCatalogueError,
+} from '../services/testsCatalogueService'
 
 export type TestsCatalogueHookContext = CatalogueSecurityContext & {
   securityContextReady: boolean
@@ -195,25 +198,39 @@ export const useTestsCatalogueMutations = (
           'testBenchmarkId' | 'status' | 'createdAt' | 'updatedAt' | 'createdBy'
         >,
       ) => {
+        const effectivePermissions =
+          context.accesses.find(
+            ({ userId, teamId }) =>
+              userId === context.userId && teamId === context.teamId,
+          )?.rolePermissions[context.activeRoleId]?.permissions ?? []
         if (import.meta.env.DEV)
-          console.debug('[TestCatalogueAdmin DEV] Benchmark create start', {
-            documentId: [
-              'benchmark',
-              input.seasonId,
-              input.subCategoryId,
-              input.testDefinitionId,
-              `v${input.testDefinitionVersion}`,
-              input.metricKey,
-              input.benchmarkLevel,
-            ].join('_'),
-            ...input,
+          console.debug('[TestBenchmarkAdmin DEV] Création demandée', {
+            uid: context.userId,
+            activeRoleId: context.activeRoleId,
+            teamId: context.teamId,
+            seasonId: input.seasonId,
+            subCategoryId: input.subCategoryId,
+            testDefinitionId: input.testDefinitionId,
+            version: input.testDefinitionVersion,
+            metricKey: input.metricKey,
+            benchmarkLevel: input.benchmarkLevel,
+            targetValue: input.targetValue,
+            securityContextReady: context.securityContextReady,
+            effectivePermissions,
+            canManageTests: canManageTests(context.accesses, context),
           })
         try {
           return await testsCatalogueService.createBenchmark(context, input)
         } catch (error) {
           if (import.meta.env.DEV) {
             const failure = error as Error & { code?: string }
-            console.error('[TestCatalogueAdmin DEV] Benchmark create error', {
+            console.error('[TestBenchmarkAdmin DEV] Création refusée', {
+              layer:
+                error instanceof TestsCatalogueError
+                  ? 'service'
+                  : failure.code
+                    ? 'FIRESTORE'
+                    : 'repository',
               code: failure.code ?? 'UNKNOWN',
               message: failure.message,
             })

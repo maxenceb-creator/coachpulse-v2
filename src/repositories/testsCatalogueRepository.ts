@@ -19,7 +19,7 @@ import {
   testDefinitionSchema,
   categorySchema,
 } from '../validation/schemas'
-import { many, one, update } from './firestoreRepository'
+import { many, one, set as setDocument, update } from './firestoreRepository'
 
 export type DefinitionWrite = Omit<
   TestDefinition,
@@ -133,7 +133,23 @@ export const testsCatalogueRepository: TestsCatalogueRepository = {
     ).flat(),
   createBenchmark: (value) => {
     const { testBenchmarkId, ...data } = value
-    return createIfAbsent('testBenchmarks', testBenchmarkId, defined(data))
+    return setDocument('testBenchmarks', testBenchmarkId, {
+      ...defined(data),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }).catch(async (error: unknown) => {
+      try {
+        if (await one('testBenchmarks', testBenchmarkId, testBenchmarkSchema))
+          throw new Error('DOCUMENT_ALREADY_EXISTS')
+      } catch (inspectionError) {
+        if (
+          inspectionError instanceof Error &&
+          inspectionError.message === 'DOCUMENT_ALREADY_EXISTS'
+        )
+          throw inspectionError
+      }
+      throw error
+    })
   },
   getBenchmark: (id) => one('testBenchmarks', id, testBenchmarkSchema),
   updateBenchmark: (id, value) =>

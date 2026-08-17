@@ -277,6 +277,47 @@ describe('testsCatalogueService', () => {
     expect(repo.createBenchmark).toHaveBeenCalledWith(created)
   })
 
+  it.each([
+    ['tests.write', ['tests.write']],
+    ['tests.read', ['tests.read']],
+  ])(
+    'refuse la création benchmark avec %s sans tests.manage',
+    async (_, permissions) => {
+      const repo = repository()
+      const service = createTestsCatalogueService(repo)
+
+      await expect(
+        service.createBenchmark(context(permissions), {
+          testDefinitionId: 'test-generic-v1',
+          testDefinitionVersion: 1,
+          metricKey: 'METRIC_A',
+          subCategoryId: 'u13',
+          seasonId: 'season',
+          benchmarkLevel: 'TARGET',
+          targetValue: 35,
+        }),
+      ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' })
+      expect(repo.createBenchmark).not.toHaveBeenCalled()
+    },
+  )
+
+  it('autorise un contexte administrateur portant tests.manage', async () => {
+    const repo = repository()
+    const service = createTestsCatalogueService(repo)
+
+    await expect(
+      service.createBenchmark(context(['tests.manage']), {
+        testDefinitionId: 'test-generic-v1',
+        testDefinitionVersion: 1,
+        metricKey: 'METRIC_A',
+        subCategoryId: 'u13',
+        seasonId: 'season',
+        benchmarkLevel: 'TARGET',
+        targetValue: 35,
+      }),
+    ).resolves.toMatchObject({ status: 'ACTIVE' })
+  })
+
   it('limite la lecture des benchmarks aux sous-catégories de la Category active', async () => {
     const repo = repository()
     const service = createTestsCatalogueService(repo)
