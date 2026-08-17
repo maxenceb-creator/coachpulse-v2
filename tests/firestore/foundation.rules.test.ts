@@ -491,12 +491,17 @@ describe('Security Rules administration Tests PR09', () => {
         .status,
     ).toBe('ARCHIVED')
     await assertSucceeds(deleteDoc(doc(db, 'testBenchmarks/new-target')))
-    expect((await getDoc(doc(db, 'testBenchmarks/new-target'))).exists()).toBe(
-      false,
-    )
-    expect(
-      (await getDoc(doc(db, 'testDefinitions/test-vertical-jump-v1'))).exists(),
-    ).toBe(true)
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      expect(
+        (await getDoc(doc(admin, 'testBenchmarks/new-target'))).exists(),
+      ).toBe(false)
+      expect(
+        (
+          await getDoc(doc(admin, 'testDefinitions/test-vertical-jump-v1'))
+        ).exists(),
+      ).toBe(true)
+    })
     await assertFails(
       getDocs(
         query(
