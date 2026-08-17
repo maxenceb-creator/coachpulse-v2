@@ -5,7 +5,7 @@ import type {
   CatalogueSecurityContext,
   DefinitionDraftInput,
 } from '../services/testsCatalogueService'
-import type { TestBenchmark } from '../types/domain'
+import type { TestBenchmark, TestDefinition } from '../types/domain'
 import { isTestDefinitionAdminQueryEnabled } from '../pages/testDefinitionAdminState'
 import {
   canManageTests,
@@ -106,6 +106,34 @@ export const useTestsCatalogueMutations = (
   id?: string,
 ) => {
   const client = useQueryClient()
+  const benchmarkAdminPrefix = [
+    'testBenchmarksAdmin',
+    context.userId,
+    context.activeRoleId,
+    context.teamId,
+    context.seasonId,
+    id,
+  ] as const
+  const updateBenchmarkCache = (
+    updateCached: (items: TestBenchmark[]) => TestBenchmark[],
+  ) =>
+    client.setQueriesData<TestBenchmark[]>(
+      { queryKey: benchmarkAdminPrefix },
+      (items) => (items ? updateCached(items) : items),
+    )
+  const refreshBenchmarks = () =>
+    client.invalidateQueries({ queryKey: benchmarkAdminPrefix })
+  const setDefinitionCache = (definition: TestDefinition) =>
+    client.setQueryData(
+      queryKeys.tests.definitionAdmin(
+        context.userId,
+        context.activeRoleId,
+        context.teamId,
+        context.seasonId,
+        definition.testDefinitionId,
+      ),
+      { definition },
+    )
   const invalidateAnalysis = () =>
     client.invalidateQueries({
       queryKey: queryKeys.tests.analysisRoot(
@@ -140,7 +168,10 @@ export const useTestsCatalogueMutations = (
     create: useMutation({
       mutationFn: (input: DefinitionDraftInput) =>
         testsCatalogueService.create(context, input),
-      onSuccess: (definition) => invalidate(definition.testDefinitionId),
+      onSuccess: async (definition) => {
+        setDefinitionCache(definition)
+        await invalidate(definition.testDefinitionId)
+      },
     }),
     update: useMutation({
       mutationFn: async (input: DefinitionDraftInput) => {
@@ -171,34 +202,45 @@ export const useTestsCatalogueMutations = (
         }
       },
       onSuccess: async (definition) => {
-        client.setQueryData(
-          queryKeys.tests.definitionAdmin(
+        setDefinitionCache(definition)
+        await invalidate(id)
+      },
+    }),
+    activate: useMutation({
+      mutationFn: () => testsCatalogueService.activate(context, id!),
+      onSuccess: async (definition) => {
+        setDefinitionCache(definition)
+        await invalidate(id)
+      },
+    }),
+    nextVersion: useMutation({
+      mutationFn: () => testsCatalogueService.createNextVersion(context, id!),
+      onSuccess: async (definition) => {
+        setDefinitionCache(definition)
+        await invalidate(definition.testDefinitionId)
+      },
+    }),
+    archive: useMutation({
+      mutationFn: () => testsCatalogueService.archive(context, id!),
+      onSuccess: async (definition) => {
+        setDefinitionCache(definition)
+        await invalidate(id)
+      },
+    }),
+    remove: useMutation({
+      mutationFn: () => testsCatalogueService.deleteUnusedDraft(context, id!),
+      onSuccess: async () => {
+        client.removeQueries({
+          queryKey: queryKeys.tests.definitionAdmin(
             context.userId,
             context.activeRoleId,
             context.teamId,
             context.seasonId,
             id!,
           ),
-          { definition },
-        )
-        await invalidate(id)
+        })
+        await invalidate()
       },
-    }),
-    activate: useMutation({
-      mutationFn: () => testsCatalogueService.activate(context, id!),
-      onSuccess: () => invalidate(id),
-    }),
-    nextVersion: useMutation({
-      mutationFn: () => testsCatalogueService.createNextVersion(context, id!),
-      onSuccess: (definition) => invalidate(definition.testDefinitionId),
-    }),
-    archive: useMutation({
-      mutationFn: () => testsCatalogueService.archive(context, id!),
-      onSuccess: () => invalidate(id),
-    }),
-    remove: useMutation({
-      mutationFn: () => testsCatalogueService.deleteUnusedDraft(context, id!),
-      onSuccess: () => invalidate(),
     }),
     createBenchmark: useMutation({
       mutationFn: async (
@@ -247,34 +289,28 @@ export const useTestsCatalogueMutations = (
           throw error
         }
       },
-      onSuccess: async () => {
-        await client.invalidateQueries({
-          queryKey: [
-            'testBenchmarksAdmin',
-            context.userId,
-            context.activeRoleId,
-            context.teamId,
-            context.seasonId,
-            id,
-          ],
-        })
+      onSuccess: async (created) => {
+        updateBenchmarkCache((items) => [
+          ...items.filter(
+            ({ testBenchmarkId }) =>
+              testBenchmarkId !== created.testBenchmarkId,
+          ),
+          created,
+        ])
+        await refreshBenchmarks()
         await invalidateAnalysis()
       },
     }),
     archiveBenchmark: useMutation({
       mutationFn: (benchmarkId: string) =>
         testsCatalogueService.archiveBenchmark(context, benchmarkId),
-      onSuccess: async () => {
-        await client.invalidateQueries({
-          queryKey: [
-            'testBenchmarksAdmin',
-            context.userId,
-            context.activeRoleId,
-            context.teamId,
-            context.seasonId,
-            id,
-          ],
-        })
+      onSuccess: async (archived) => {
+        updateBenchmarkCache((items) =>
+          items.map((item) =>
+            item.testBenchmarkId === archived.testBenchmarkId ? archived : item,
+          ),
+        )
+        await refreshBenchmarks()
         await invalidateAnalysis()
       },
     }),
@@ -288,17 +324,26 @@ export const useTestsCatalogueMutations = (
           targetValue: input.targetValue,
           label: input.label,
         }),
-      onSuccess: async () => {
-        await client.invalidateQueries({
-          queryKey: [
-            'testBenchmarksAdmin',
-            context.userId,
-            context.activeRoleId,
-            context.teamId,
-            context.seasonId,
-            id,
-          ],
-        })
+      onSuccess: async (updated) => {
+        updateBenchmarkCache((items) =>
+          items.map((item) =>
+            item.testBenchmarkId === updated.testBenchmarkId ? updated : item,
+          ),
+        )
+        await refreshBenchmarks()
+        await invalidateAnalysis()
+      },
+    }),
+    deleteBenchmark: useMutation({
+      mutationFn: (benchmarkId: string) =>
+        testsCatalogueService.deleteBenchmark(context, benchmarkId),
+      onSuccess: async (_, benchmarkId) => {
+        updateBenchmarkCache((items) =>
+          items.filter(
+            ({ testBenchmarkId }) => testBenchmarkId !== benchmarkId,
+          ),
+        )
+        await refreshBenchmarks()
         await invalidateAnalysis()
       },
     }),

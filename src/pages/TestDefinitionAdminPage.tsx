@@ -20,22 +20,28 @@ import { resolveTestDefinitionAdminViewState } from './testDefinitionAdminState'
 import {
   benchmarkCreationErrorMessage,
   benchmarkMetricOptions,
+  confirmBenchmarkDeletion,
   definitionSaveErrorMessage,
   hasUnsavedBenchmarkMetrics,
 } from './testBenchmarkAdminState'
 
-function BenchmarkRow({
+export function BenchmarkRow({
   item,
   subCategoryName,
   onUpdate,
   onArchive,
+  onDelete,
+  isMutating,
 }: {
   item: TestBenchmark
   subCategoryName?: string
   onUpdate: (targetValue: number) => void
   onArchive: () => void
+  onDelete: () => void
+  isMutating: boolean
 }) {
   const [targetValue, setTargetValue] = useState(String(item.targetValue))
+  useEffect(() => setTargetValue(String(item.targetValue)), [item.targetValue])
   return (
     <tr>
       <td>{subCategoryName}</td>
@@ -54,14 +60,24 @@ function BenchmarkRow({
       <td className="entry-actions">
         {item.status === 'ACTIVE' ? (
           <>
-            <button onClick={() => onUpdate(Number(targetValue))}>
-              Mettre à jour
+            <button
+              disabled={isMutating}
+              onClick={() => onUpdate(Number(targetValue))}
+            >
+              {isMutating ? 'Traitement…' : 'Mettre à jour'}
             </button>
-            <button className="secondary" onClick={onArchive}>
+            <button
+              className="secondary"
+              disabled={isMutating}
+              onClick={onArchive}
+            >
               Archiver
             </button>
           </>
         ) : null}
+        <button className="danger" disabled={isMutating} onClick={onDelete}>
+          Supprimer
+        </button>
       </td>
     </tr>
   )
@@ -473,10 +489,16 @@ export function TestDefinitionAdminPage() {
         </section>
         <section className="entry-actions admin-actions">
           {editable ? (
-            <button onClick={() => mutations.activate.mutate()}>Activer</button>
+            <button
+              disabled={mutations.activate.isPending}
+              onClick={() => mutations.activate.mutate()}
+            >
+              {mutations.activate.isPending ? 'Activation…' : 'Activer'}
+            </button>
           ) : null}
           <button
             className="secondary"
+            disabled={mutations.nextVersion.isPending}
             onClick={() =>
               mutations.nextVersion.mutate(undefined, {
                 onSuccess: (next) =>
@@ -489,6 +511,7 @@ export function TestDefinitionAdminPage() {
           {definition.status !== 'ARCHIVED' ? (
             <button
               className="secondary"
+              disabled={mutations.archive.isPending}
               onClick={() => mutations.archive.mutate()}
             >
               Archiver
@@ -497,6 +520,7 @@ export function TestDefinitionAdminPage() {
           {editable ? (
             <button
               className="danger"
+              disabled={mutations.remove.isPending}
               onClick={() =>
                 mutations.remove.mutate(undefined, {
                   onSuccess: () => navigate('/tests/admin'),
@@ -507,6 +531,14 @@ export function TestDefinitionAdminPage() {
             </button>
           ) : null}
         </section>
+        {mutations.activate.isError ||
+        mutations.nextVersion.isError ||
+        mutations.archive.isError ||
+        mutations.remove.isError ? (
+          <p className="card error">
+            Impossible d’appliquer cette action au protocole.
+          </p>
+        ) : null}
         <section className="tests-domain">
           <h2>Benchmarks de la saison</h2>
           <form
@@ -607,7 +639,14 @@ export function TestDefinitionAdminPage() {
                 }
               />
             </label>
-            <button disabled={benchmarkMetricsAreUnsaved}>Ajouter</button>
+            <button
+              disabled={
+                benchmarkMetricsAreUnsaved ||
+                mutations.createBenchmark.isPending
+              }
+            >
+              {mutations.createBenchmark.isPending ? 'Ajout…' : 'Ajouter'}
+            </button>
             {benchmarkMetricsAreUnsaved ? (
               <p>
                 La métrique sélectionnée est encore dans le brouillon.
@@ -649,6 +688,21 @@ export function TestDefinitionAdminPage() {
                       onArchive={() =>
                         mutations.archiveBenchmark.mutate(item.testBenchmarkId)
                       }
+                      onDelete={() => {
+                        if (confirmBenchmarkDeletion())
+                          mutations.deleteBenchmark.mutate(item.testBenchmarkId)
+                      }}
+                      isMutating={
+                        (mutations.updateBenchmark.isPending &&
+                          mutations.updateBenchmark.variables?.benchmarkId ===
+                            item.testBenchmarkId) ||
+                        (mutations.archiveBenchmark.isPending &&
+                          mutations.archiveBenchmark.variables ===
+                            item.testBenchmarkId) ||
+                        (mutations.deleteBenchmark.isPending &&
+                          mutations.deleteBenchmark.variables ===
+                            item.testBenchmarkId)
+                      }
                     />
                   ))}
                 </tbody>
@@ -657,6 +711,13 @@ export function TestDefinitionAdminPage() {
           ) : (
             <p className="card empty-state">Aucun benchmark défini</p>
           )}
+          {mutations.updateBenchmark.isError ||
+          mutations.archiveBenchmark.isError ||
+          mutations.deleteBenchmark.isError ? (
+            <p className="card error">
+              Impossible d’appliquer cette action au benchmark.
+            </p>
+          ) : null}
         </section>
       </main>
     </>

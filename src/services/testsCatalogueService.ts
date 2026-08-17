@@ -250,6 +250,7 @@ export const createTestsCatalogueService = (
       const existing = await repository.getDefinition(id)
       if (!existing) throw new TestsCatalogueError('TEST_DEFINITION_NOT_FOUND')
       await repository.updateDefinition(id, { status: 'ARCHIVED' })
+      return { ...existing, status: 'ARCHIVED' as const, updatedAt: new Date() }
     },
     async deleteUnusedDraft(context: CatalogueSecurityContext, id: string) {
       requireManage(context)
@@ -356,10 +357,35 @@ export const createTestsCatalogueService = (
         targetValue: input.targetValue,
         ...(input.label?.trim() ? { label: input.label.trim() } : {}),
       })
+      return {
+        ...existing,
+        targetValue: input.targetValue,
+        ...(input.label?.trim() ? { label: input.label.trim() } : {}),
+        updatedAt: new Date(),
+      }
     },
     async archiveBenchmark(context: CatalogueSecurityContext, id: string) {
       requireManage(context)
+      const existing = await repository.getBenchmark(id)
+      if (
+        !existing ||
+        existing.seasonId !== context.seasonId ||
+        !(await allowedSubCategoryIds(context)).includes(existing.subCategoryId)
+      )
+        throw new TestsCatalogueError('BENCHMARK_INVALID')
       await repository.updateBenchmark(id, { status: 'ARCHIVED' })
+      return { ...existing, status: 'ARCHIVED' as const, updatedAt: new Date() }
+    },
+    async deleteBenchmark(context: CatalogueSecurityContext, id: string) {
+      requireManage(context)
+      const existing = await repository.getBenchmark(id)
+      if (
+        !existing ||
+        existing.seasonId !== context.seasonId ||
+        !(await allowedSubCategoryIds(context)).includes(existing.subCategoryId)
+      )
+        throw new TestsCatalogueError('BENCHMARK_INVALID')
+      await repository.deleteBenchmark(id)
     },
     async subCategories(context: CatalogueSecurityContext) {
       requireManage(context)

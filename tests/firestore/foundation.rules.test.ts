@@ -439,6 +439,7 @@ describe('Security Rules administration Tests PR09', () => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }
+    await assertFails(deleteDoc(doc(db, 'testBenchmarks/benchmark-a')))
     await assertFails(setDoc(doc(db, 'testBenchmarks/new-target'), data))
     await updateDoc(doc(db, 'users/user-a'), {
       securityContext: securityContext('manager'),
@@ -489,6 +490,13 @@ describe('Security Rules administration Tests PR09', () => {
       visibleBenchmarks.docs.find(({ id }) => id === 'new-target')?.data()
         .status,
     ).toBe('ARCHIVED')
+    await assertSucceeds(deleteDoc(doc(db, 'testBenchmarks/new-target')))
+    expect((await getDoc(doc(db, 'testBenchmarks/new-target'))).exists()).toBe(
+      false,
+    )
+    expect(
+      (await getDoc(doc(db, 'testDefinitions/test-vertical-jump-v1'))).exists(),
+    ).toBe(true)
     await assertFails(
       getDocs(
         query(

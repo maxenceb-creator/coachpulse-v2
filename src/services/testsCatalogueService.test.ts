@@ -72,6 +72,7 @@ const repository = (existing = definition()): TestsCatalogueRepository => ({
   createBenchmark: vi.fn(async () => undefined),
   getBenchmark: vi.fn(async () => null),
   updateBenchmark: vi.fn(async () => undefined),
+  deleteBenchmark: vi.fn(async () => undefined),
   listSubCategories: vi.fn(async () => []),
   getCategory: vi.fn(async () => ({
     categoryId: 'category',
@@ -330,6 +331,57 @@ describe('testsCatalogueService', () => {
       'season',
       ['u13'],
     )
+  })
+
+  it('supprime uniquement un benchmark du scope actif avec tests.manage', async () => {
+    const repo = repository()
+    const existing = {
+      testBenchmarkId: 'benchmark-u13-height-target',
+      testDefinitionId: 'test-generic-v1',
+      testDefinitionVersion: 1,
+      metricKey: 'METRIC_A',
+      subCategoryId: 'u13',
+      seasonId: 'season',
+      benchmarkLevel: 'TARGET' as const,
+      targetValue: 35,
+      status: 'ACTIVE' as const,
+      createdBy: 'user',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    vi.mocked(repo.getBenchmark).mockResolvedValue(existing)
+    const service = createTestsCatalogueService(repo)
+
+    await service.deleteBenchmark(context(), existing.testBenchmarkId)
+
+    expect(repo.deleteBenchmark).toHaveBeenCalledWith(existing.testBenchmarkId)
+    expect(repo.deleteDefinition).not.toHaveBeenCalled()
+  })
+
+  it('refuse de supprimer un benchmark sans tests.manage ou hors scope', async () => {
+    const repo = repository()
+    vi.mocked(repo.getBenchmark).mockResolvedValue({
+      testBenchmarkId: 'benchmark-u14-height-target',
+      testDefinitionId: 'test-generic-v1',
+      testDefinitionVersion: 1,
+      metricKey: 'METRIC_A',
+      subCategoryId: 'u14',
+      seasonId: 'season',
+      benchmarkLevel: 'TARGET',
+      targetValue: 40,
+      status: 'ACTIVE',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    const service = createTestsCatalogueService(repo)
+
+    await expect(
+      service.deleteBenchmark(context(['tests.write']), 'benchmark'),
+    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' })
+    await expect(
+      service.deleteBenchmark(context(), 'benchmark'),
+    ).rejects.toMatchObject({ code: 'BENCHMARK_INVALID' })
+    expect(repo.deleteBenchmark).not.toHaveBeenCalled()
   })
 
   it('charge les sous-catégories canoniques de la Category et de la saison', async () => {

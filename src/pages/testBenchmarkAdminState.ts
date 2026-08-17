@@ -11,6 +11,13 @@ export const benchmarkMetricOptions = (metrics: TestMetricDefinition[]) =>
     .map((metric, index) => ({ ...metric, order: metric.order ?? index }))
     .sort((left, right) => left.order - right.order)
 
+export const confirmBenchmarkDeletion = (
+  confirm: (message: string) => boolean = window.confirm,
+) =>
+  confirm(
+    'Supprimer définitivement ce benchmark ? Cette action est irréversible.',
+  )
+
 export const benchmarkCreationErrorMessage = (error: unknown) => {
   const code =
     error instanceof TestsCatalogueError

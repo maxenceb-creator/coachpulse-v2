@@ -373,7 +373,8 @@ service cloud.firestore {
         && benchmarkInActiveCategory(resource.data);
       allow create: if validBenchmarkWrite(testBenchmarkId, true);
       allow update: if validBenchmarkWrite(testBenchmarkId, false);
-      allow delete: if false;
+      allow delete: if canInActiveSecurityContext('tests.manage')
+        && benchmarkInActiveCategory(resource.data);
     }
 
     match /testSessions/{testSessionId} {

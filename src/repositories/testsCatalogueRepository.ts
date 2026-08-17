@@ -43,6 +43,7 @@ export interface TestsCatalogueRepository {
   createBenchmark(value: TestBenchmark): Promise<void>
   getBenchmark(id: string): Promise<TestBenchmark | null>
   updateBenchmark(id: string, value: Partial<TestBenchmark>): Promise<void>
+  deleteBenchmark(id: string): Promise<void>
   listSubCategories(seasonId: string, ids: string[]): Promise<SubCategory[]>
   getCategory(id: string): Promise<Category | null>
 }
@@ -157,6 +158,7 @@ export const testsCatalogueRepository: TestsCatalogueRepository = {
       ...defined(value),
       updatedAt: serverTimestamp(),
     }),
+  deleteBenchmark: (id) => deleteDoc(doc(db, 'testBenchmarks', id)),
   listSubCategories: async (seasonId, ids) => {
     if (!ids.length) return []
     const subCategories = await Promise.all(

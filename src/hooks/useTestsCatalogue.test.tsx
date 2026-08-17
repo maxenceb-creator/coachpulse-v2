@@ -16,6 +16,9 @@ vi.mock('../services/appTestsService', () => ({
     listBenchmarks: vi.fn(),
     subCategories: vi.fn(),
     createBenchmark: vi.fn(),
+    updateBenchmark: vi.fn(),
+    archiveBenchmark: vi.fn(),
+    deleteBenchmark: vi.fn(),
   },
 }))
 
@@ -92,6 +95,39 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
         return created
       },
     )
+    vi.mocked(testsCatalogueService.updateBenchmark).mockImplementation(
+      async (_context, benchmarkId, input) => {
+        const updated = {
+          ...benchmarks.find((item) => item.testBenchmarkId === benchmarkId)!,
+          ...input,
+          updatedAt: new Date(),
+        }
+        benchmarks = benchmarks.map((item) =>
+          item.testBenchmarkId === benchmarkId ? updated : item,
+        )
+        return updated
+      },
+    )
+    vi.mocked(testsCatalogueService.archiveBenchmark).mockImplementation(
+      async (_context, benchmarkId) => {
+        const archived = {
+          ...benchmarks.find((item) => item.testBenchmarkId === benchmarkId)!,
+          status: 'ARCHIVED' as const,
+          updatedAt: new Date(),
+        }
+        benchmarks = benchmarks.map((item) =>
+          item.testBenchmarkId === benchmarkId ? archived : item,
+        )
+        return archived
+      },
+    )
+    vi.mocked(testsCatalogueService.deleteBenchmark).mockImplementation(
+      async (_context, benchmarkId) => {
+        benchmarks = benchmarks.filter(
+          (item) => item.testBenchmarkId !== benchmarkId,
+        )
+      },
+    )
   })
 
   it('charge HEIGHT, crée TARGET 35 et recharge la liste', async () => {
@@ -144,5 +180,35 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
       ]),
     )
     expect(client.getQueryState(analysisKey)?.isInvalidated).toBe(true)
+
+    await act(() =>
+      result.current.mutations.updateBenchmark.mutateAsync({
+        benchmarkId: 'benchmark-height-target',
+        targetValue: 45,
+      }),
+    )
+    await waitFor(() =>
+      expect(result.current.admin.benchmarks.data?.[0]?.targetValue).toBe(45),
+    )
+
+    await act(() =>
+      result.current.mutations.archiveBenchmark.mutateAsync(
+        'benchmark-height-target',
+      ),
+    )
+    await waitFor(() =>
+      expect(result.current.admin.benchmarks.data?.[0]?.status).toBe(
+        'ARCHIVED',
+      ),
+    )
+
+    await act(() =>
+      result.current.mutations.deleteBenchmark.mutateAsync(
+        'benchmark-height-target',
+      ),
+    )
+    await waitFor(() =>
+      expect(result.current.admin.benchmarks.data).toEqual([]),
+    )
   })
 })

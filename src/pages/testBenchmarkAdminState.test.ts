@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { TestsCatalogueError } from '../services/testsCatalogueService'
 import type { TestMetricDefinition } from '../types/domain'
 import {
   benchmarkCreationErrorMessage,
   benchmarkMetricOptions,
+  confirmBenchmarkDeletion,
   definitionSaveErrorMessage,
   hasUnsavedBenchmarkMetrics,
 } from './testBenchmarkAdminState'
@@ -34,6 +35,15 @@ describe('administration des benchmarks', () => {
       'HEIGHT',
       'DISTANCE',
     ])
+  })
+
+  it('demande une confirmation explicite avant suppression définitive', () => {
+    const confirm = vi.fn(() => true)
+
+    expect(confirmBenchmarkDeletion(confirm)).toBe(true)
+    expect(confirm).toHaveBeenCalledWith(
+      'Supprimer définitivement ce benchmark ? Cette action est irréversible.',
+    )
   })
 
   it.each([
