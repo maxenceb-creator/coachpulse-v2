@@ -50,14 +50,9 @@ export function TestPlayerHistoryPage() {
     [history.data, domain, definitionId],
   )
 
-  if (
-    app.loading ||
-    !app.securityContextReady ||
-    roster.isPending ||
-    (playerId && history.isPending)
-  )
+  if (app.loading || !app.securityContextReady || roster.isPending)
     return <main className="center">Chargement de l’historique…</main>
-  if (app.error || roster.isError || history.isError)
+  if (app.error || roster.isError)
     return (
       <main className="center error">
         Impossible de charger l’historique de cette joueuse.
@@ -118,6 +113,22 @@ export function TestPlayerHistoryPage() {
         {!playerId ? (
           <p className="card empty-state">
             Sélectionnez une joueuse pour consulter son historique.
+          </p>
+        ) : null}
+        {playerId && history.isPending ? (
+          <section className="card" aria-live="polite">
+            <h1>
+              {roster.data?.find((player) => player.playerId === playerId)
+                ?.firstName ?? 'Joueuse'}{' '}
+              {roster.data?.find((player) => player.playerId === playerId)
+                ?.lastName ?? ''}
+            </h1>
+            <p>Chargement des résultats…</p>
+          </section>
+        ) : null}
+        {history.isError ? (
+          <p className="card error">
+            Impossible de charger l’historique de cette joueuse.
           </p>
         ) : null}
         {history.data ? (
