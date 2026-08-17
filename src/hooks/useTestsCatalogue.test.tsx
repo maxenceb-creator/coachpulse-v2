@@ -70,16 +70,21 @@ const context = {
 describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
   let client: QueryClient
   let benchmarks: TestBenchmark[]
+  let blockBenchmarkRefetch: boolean
 
   beforeEach(() => {
     client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
     benchmarks = []
+    blockBenchmarkRefetch = false
     vi.mocked(testsCatalogueService.get).mockResolvedValue({ definition })
     vi.mocked(testsCatalogueService.subCategories).mockResolvedValue([])
     vi.mocked(testsCatalogueService.listBenchmarks).mockImplementation(
-      async () => benchmarks,
+      async () => {
+        if (blockBenchmarkRefetch) return new Promise<TestBenchmark[]>(() => {})
+        return benchmarks
+      },
     )
     vi.mocked(testsCatalogueService.createBenchmark).mockImplementation(
       async (_context, input) => {
@@ -130,7 +135,7 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
     )
   })
 
-  it('charge HEIGHT, crée TARGET 35 et recharge la liste', async () => {
+  it('termine create/update/archive/delete sans attendre un refetch bloqué', async () => {
     const wrapper = ({ children }: PropsWithChildren) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     )
@@ -150,6 +155,10 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
         result.current.admin.detail.data?.definition.metrics[0]?.metricKey,
       ).toBe('HEIGHT'),
     )
+    await waitFor(() =>
+      expect(result.current.admin.benchmarks.isSuccess).toBe(true),
+    )
+    blockBenchmarkRefetch = true
 
     const analysisKey = queryKeys.tests.analysis(
       context.userId,
@@ -179,6 +188,7 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
         expect.objectContaining({ metricKey: 'HEIGHT', targetValue: 35 }),
       ]),
     )
+    expect(result.current.mutations.createBenchmark.isPending).toBe(false)
     expect(client.getQueryState(analysisKey)?.isInvalidated).toBe(true)
 
     await act(() =>
@@ -190,6 +200,7 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
     await waitFor(() =>
       expect(result.current.admin.benchmarks.data?.[0]?.targetValue).toBe(45),
     )
+    expect(result.current.mutations.updateBenchmark.isPending).toBe(false)
 
     await act(() =>
       result.current.mutations.archiveBenchmark.mutateAsync(
@@ -201,6 +212,7 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
         'ARCHIVED',
       ),
     )
+    expect(result.current.mutations.archiveBenchmark.isPending).toBe(false)
 
     await act(() =>
       result.current.mutations.deleteBenchmark.mutateAsync(
@@ -210,5 +222,6 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
     await waitFor(() =>
       expect(result.current.admin.benchmarks.data).toEqual([]),
     )
+    expect(result.current.mutations.deleteBenchmark.isPending).toBe(false)
   })
 })

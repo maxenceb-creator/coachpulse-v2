@@ -8,6 +8,7 @@ import type {
 import type { TestBenchmark, TestDefinition } from '../types/domain'
 import { isTestDefinitionAdminQueryEnabled } from '../pages/testDefinitionAdminState'
 import {
+  benchmarkDocumentId,
   canManageTests,
   TestsCatalogueError,
 } from '../services/testsCatalogueService'
@@ -135,14 +136,15 @@ export const useTestsCatalogueMutations = (
       { definition },
     )
   const runBenchmarkMutation = async <T>(
-    operation: 'update' | 'archive' | 'delete',
+    operation: 'create' | 'update' | 'archive' | 'delete',
     benchmarkId: string,
     mutation: () => Promise<T>,
   ) => {
     if (import.meta.env.DEV)
-      console.debug('[TestBenchmarkAdmin DEV] Mutation demandée', {
+      console.debug('[TestBenchmarkMutation DEV]', {
         operation,
         benchmarkId,
+        step: 'mutation start',
         uid: context.userId,
         activeRoleId: context.activeRoleId,
         teamId: context.teamId,
@@ -152,13 +154,21 @@ export const useTestsCatalogueMutations = (
         canManageTests: canManageTests(context.accesses, context),
       })
     try {
-      return await mutation()
+      const result = await mutation()
+      if (import.meta.env.DEV)
+        console.debug('[TestBenchmarkMutation DEV]', {
+          operation,
+          benchmarkId,
+          step: 'Firestore success',
+        })
+      return result
     } catch (error) {
       if (import.meta.env.DEV) {
         const failure = error as Error & { code?: string }
-        console.error('[TestBenchmarkAdmin DEV] Mutation échouée', {
+        console.error('[TestBenchmarkMutation DEV]', {
           operation,
           benchmarkId,
+          step: 'mutation error',
           layer:
             error instanceof TestsCatalogueError
               ? 'service'
@@ -171,6 +181,50 @@ export const useTestsCatalogueMutations = (
       }
       throw error
     }
+  }
+  const reconcileBenchmarkQueries = (
+    operation: 'create' | 'update' | 'archive' | 'delete',
+    benchmarkId: string,
+  ) => {
+    if (import.meta.env.DEV)
+      console.debug('[TestBenchmarkMutation DEV]', {
+        operation,
+        benchmarkId,
+        step: 'invalidation start',
+      })
+    void Promise.all([refreshBenchmarks(), invalidateAnalysis()])
+      .then(() => {
+        if (import.meta.env.DEV)
+          console.debug('[TestBenchmarkMutation DEV]', {
+            operation,
+            benchmarkId,
+            step: 'invalidation end',
+          })
+      })
+      .catch((error: unknown) => {
+        if (import.meta.env.DEV) {
+          const failure = error as Error & { code?: string }
+          console.error('[TestBenchmarkMutation DEV]', {
+            operation,
+            benchmarkId,
+            step: 'invalidation error',
+            code: failure.code ?? 'UNKNOWN',
+            message: failure.message,
+          })
+        }
+      })
+  }
+  const logBenchmarkMutationStep = (
+    operation: 'create' | 'update' | 'archive' | 'delete',
+    benchmarkId: string,
+    step: 'cache update' | 'mutation settled',
+  ) => {
+    if (import.meta.env.DEV)
+      console.debug('[TestBenchmarkMutation DEV]', {
+        operation,
+        benchmarkId,
+        step,
+      })
   }
   const invalidateAnalysis = () =>
     client.invalidateQueries({
@@ -308,26 +362,12 @@ export const useTestsCatalogueMutations = (
             effectivePermissions,
             canManageTests: canManageTests(context.accesses, context),
           })
-        try {
-          return await testsCatalogueService.createBenchmark(context, input)
-        } catch (error) {
-          if (import.meta.env.DEV) {
-            const failure = error as Error & { code?: string }
-            console.error('[TestBenchmarkAdmin DEV] Création refusée', {
-              layer:
-                error instanceof TestsCatalogueError
-                  ? 'service'
-                  : failure.code
-                    ? 'FIRESTORE'
-                    : 'repository',
-              code: failure.code ?? 'UNKNOWN',
-              message: failure.message,
-            })
-          }
-          throw error
-        }
+        const benchmarkId = benchmarkDocumentId(input)
+        return runBenchmarkMutation('create', benchmarkId, () =>
+          testsCatalogueService.createBenchmark(context, input),
+        )
       },
-      onSuccess: async (created) => {
+      onSuccess: (created) => {
         updateBenchmarkCache((items) => [
           ...items.filter(
             ({ testBenchmarkId }) =>
@@ -335,24 +375,40 @@ export const useTestsCatalogueMutations = (
           ),
           created,
         ])
-        await refreshBenchmarks()
-        await invalidateAnalysis()
+        logBenchmarkMutationStep(
+          'create',
+          created.testBenchmarkId,
+          'cache update',
+        )
+        reconcileBenchmarkQueries('create', created.testBenchmarkId)
       },
+      onSettled: (created, _error, input) =>
+        logBenchmarkMutationStep(
+          'create',
+          created?.testBenchmarkId ?? benchmarkDocumentId(input),
+          'mutation settled',
+        ),
     }),
     archiveBenchmark: useMutation({
       mutationFn: (benchmarkId: string) =>
         runBenchmarkMutation('archive', benchmarkId, () =>
           testsCatalogueService.archiveBenchmark(context, benchmarkId),
         ),
-      onSuccess: async (archived) => {
+      onSuccess: (archived) => {
         updateBenchmarkCache((items) =>
           items.map((item) =>
             item.testBenchmarkId === archived.testBenchmarkId ? archived : item,
           ),
         )
-        await refreshBenchmarks()
-        await invalidateAnalysis()
+        logBenchmarkMutationStep(
+          'archive',
+          archived.testBenchmarkId,
+          'cache update',
+        )
+        reconcileBenchmarkQueries('archive', archived.testBenchmarkId)
       },
+      onSettled: (_archived, _error, benchmarkId) =>
+        logBenchmarkMutationStep('archive', benchmarkId, 'mutation settled'),
     }),
     updateBenchmark: useMutation({
       mutationFn: (input: {
@@ -366,30 +422,42 @@ export const useTestsCatalogueMutations = (
             label: input.label,
           }),
         ),
-      onSuccess: async (updated) => {
+      onSuccess: (updated) => {
         updateBenchmarkCache((items) =>
           items.map((item) =>
             item.testBenchmarkId === updated.testBenchmarkId ? updated : item,
           ),
         )
-        await refreshBenchmarks()
-        await invalidateAnalysis()
+        logBenchmarkMutationStep(
+          'update',
+          updated.testBenchmarkId,
+          'cache update',
+        )
+        reconcileBenchmarkQueries('update', updated.testBenchmarkId)
       },
+      onSettled: (_updated, _error, input) =>
+        logBenchmarkMutationStep(
+          'update',
+          input.benchmarkId,
+          'mutation settled',
+        ),
     }),
     deleteBenchmark: useMutation({
       mutationFn: (benchmarkId: string) =>
         runBenchmarkMutation('delete', benchmarkId, () =>
           testsCatalogueService.deleteBenchmark(context, benchmarkId),
         ),
-      onSuccess: async (_, benchmarkId) => {
+      onSuccess: (_, benchmarkId) => {
         updateBenchmarkCache((items) =>
           items.filter(
             ({ testBenchmarkId }) => testBenchmarkId !== benchmarkId,
           ),
         )
-        await refreshBenchmarks()
-        await invalidateAnalysis()
+        logBenchmarkMutationStep('delete', benchmarkId, 'cache update')
+        reconcileBenchmarkQueries('delete', benchmarkId)
       },
+      onSettled: (_deleted, _error, benchmarkId) =>
+        logBenchmarkMutationStep('delete', benchmarkId, 'mutation settled'),
     }),
   }
 }
