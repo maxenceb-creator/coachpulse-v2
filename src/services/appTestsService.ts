@@ -4,6 +4,7 @@ import { createTestsService } from './testsService'
 import { createTestsAnalysisService } from './testsAnalysisService'
 import { testsCatalogueRepository } from '../repositories/testsCatalogueRepository'
 import { createTestsCatalogueService } from './testsCatalogueService'
+import { createTestPlayerHistoryService } from './testPlayerHistoryService'
 
 export const testsService = createTestsService({
   ...testsRepository,
@@ -20,3 +21,9 @@ export const testsAnalysisService = createTestsAnalysisService({
 export const testsCatalogueService = createTestsCatalogueService(
   testsCatalogueRepository,
 )
+
+export const testPlayerHistoryService = createTestPlayerHistoryService({
+  ...testsRepository,
+  assignmentsForTeam: repositories.assignmentsForTeam,
+  activePlayers: repositories.activePlayers,
+})

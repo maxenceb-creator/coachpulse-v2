@@ -636,6 +636,79 @@ describe('Security Rules TestSession/TestResult PR07', () => {
     expect(snapshot.docs).toEqual([])
   })
 
+  it('sécurise les queries exactes de l’historique individuel PR10', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('reader'),
+      }),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'playerTeamAssignments'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          where('status', '==', 'ACTIVE'),
+        ),
+      ),
+    )
+    await assertSucceeds(getDoc(doc(db, 'players/player-a')))
+    await assertFails(getDoc(doc(db, 'players/player-b')))
+    const results = await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testResults'),
+          where('playerId', '==', 'player-a'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          limit(500),
+        ),
+      ),
+    )
+    expect(results.docs).toHaveLength(1)
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testSessions'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          where('status', '==', 'COMPLETED'),
+          orderBy('date', 'desc'),
+          limit(200),
+        ),
+      ),
+    )
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, 'testResults'),
+          where('playerId', '==', 'player-b'),
+          where('teamId', '==', 'team-b'),
+          where('seasonId', '==', seasonId),
+          limit(500),
+        ),
+      ),
+    )
+
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('analyst'),
+      }),
+    )
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, 'testResults'),
+          where('playerId', '==', 'player-a'),
+          where('teamId', '==', 'team-a'),
+          where('seasonId', '==', seasonId),
+          limit(500),
+        ),
+      ),
+    )
+  })
+
   it('autorise une session du contexte actif et refuse Team, saison ou version incohérente', async () => {
     const db = testEnv.authenticatedContext('user-a').firestore()
     await assertSucceeds(setDoc(doc(db, 'testSessions/valid'), sessionData()))

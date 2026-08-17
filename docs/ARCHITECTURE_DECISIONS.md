@@ -557,12 +557,12 @@ queryKeys.players.detail(playerId)
 
 queryKeys.matches.list({
   teamId,
-  seasonId
+  seasonId,
 })
 
 queryKeys.sessions.list({
   categoryId,
-  dateRange
+  dateRange,
 })
 ```
 
@@ -816,9 +816,9 @@ Exemple :
 
 ```ts
 permissionsService.can({
-  permission: "matches.write",
+  permission: 'matches.write',
   teamId,
-  activeRoleId
+  activeRoleId,
 })
 ```
 
@@ -1486,87 +1486,115 @@ responsive
 # 80. Décisions AD consolidées
 
 ## AD-001
+
 Vite + React + TypeScript.
 
 ## AD-002
+
 React Router pour la SPA.
 
 ## AD-003
+
 TanStack Query pour le server state et le cache.
 
 ## AD-004
+
 Zod pour la validation runtime.
 
 ## AD-005
+
 Vitest pour les tests unitaires.
 
 ## AD-006
+
 React Testing Library pour les tests composants.
 
 ## AD-007
+
 Firebase Emulator Suite pour les tests Firebase et Security Rules.
 
 ## AD-008
+
 Cloud Functions dès le socle pour AuditLog et commandes sensibles.
 
 ## AD-009
+
 Pas de Redux global pour les données métier.
 
 ## AD-010
+
 Context global limité à Auth, User, ActiveRole, Team et Season.
 
 ## AD-011
+
 Pas de monorepo complexe initialement.
 
 ## AD-012
+
 Structure simple `src/ + functions/`.
 
 ## AD-013
+
 Pas de projection métier prématurée.
 
 ## AD-014
+
 Firestore offline utilisé de manière contrôlée.
 
 ## AD-015
+
 Le Match est utilisable offline dès la première V2.
 
 ## AD-016
+
 Un appareil principal est recommandé par Match.
 
 ## AD-017
+
 Les données médicales sensibles ne sont pas préchargées massivement offline.
 
 ## AD-018
+
 PWA légère dès la fondation.
 
 ## AD-019
+
 Tests E2E ajoutés après stabilisation du premier Dashboard.
 
 ## AD-020
+
 DEV et PROD Firebase sont séparés.
 
 ## AD-021
+
 V1 et V2 restent complètement séparées.
 
 ## AD-022
+
 Aucun accès Firestore direct depuis React.
 
 ## AD-023
+
 Les services portent les règles métier.
 
 ## AD-024
+
 Les repositories portent uniquement la persistance.
 
 ## AD-025
+
 Les graphiques restent passifs.
 
 ## AD-026
+
 Les permissions sont recalculées lors d’un changement de rôle actif ou de Team.
 
 ## AD-027
+
 Les opérations critiques ne dépendent pas uniquement de mutations optimistes.
 
 ## AD-028
+
 L’audit sensible est généré côté serveur.
 
 ---
@@ -1631,7 +1659,6 @@ d'autorisation serveur dérivé et déterministe. Firestore Rules ne peut pas
 interroger `playerTeamAssignments` par recherche lors d'un `get` Player ; cet
 index minimal permet un `exists/get` déterministe sans ajouter `teamId` comme
 vérité permanente dans Player.
-
 
 ---
 
@@ -1712,3 +1739,14 @@ vérité permanente dans Player.
   saison, sous-catégorie, définition/version, métrique et niveau.
 - PR07 et PR08 consomment toujours les métriques génériques, triées par `order` ;
   aucun protocole n'est codé en dur.
+
+## Addendum PR10 — historique individuel des Tests
+
+- L'historique individuel est chargé par `playerId + teamId + seasonId` ; il ne
+  charge jamais tous les résultats Tests pour les filtrer dans React.
+- Les versions d'un protocole restent des historiques séparés. Les métriques et
+  benchmarks sont toujours interprétés avec la définition/version d'origine.
+- Le service PR10 réutilise les primitives analytics PR08 pour la meilleure
+  valeur, la dernière valeur, la progression et la comparaison au benchmark.
+- Les clés de cache incluent utilisateur, rôle actif, Team, saison et joueuse ;
+  elles sont supprimées lors d'un changement de contexte protégé.

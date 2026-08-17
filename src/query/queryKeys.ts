@@ -134,5 +134,73 @@ export const queryKeys = {
         metricKey,
         playerId,
       ] as const,
+    playerHistory: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      playerId: string,
+    ) =>
+      [
+        'tests',
+        'playerHistory',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        playerId,
+      ] as const,
+    playerRoster: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+    ) => ['tests', 'playerRoster', uid, roleId, teamId, seasonId] as const,
+    playerHistorySessions: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+    ) =>
+      [
+        'tests',
+        'playerHistorySessions',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+      ] as const,
+    playerHistoryResults: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      playerId: string,
+    ) =>
+      [
+        'tests',
+        'playerHistoryResults',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        playerId,
+      ] as const,
+    playerHistoryTaxonomy: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      categoryId: string,
+    ) =>
+      [
+        'tests',
+        'playerHistoryTaxonomy',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        categoryId,
+      ] as const,
   },
 }
