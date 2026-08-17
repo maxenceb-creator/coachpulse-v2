@@ -40,6 +40,18 @@ export function TestsPage() {
     teamId: context.activeTeamId ?? '',
     permissionKey: 'tests.write',
   })
+  const canReadTests = hasPermission(context.accesses, {
+    userId: user?.uid ?? '',
+    activeRoleId: context.activeRoleId ?? '',
+    teamId: context.activeTeamId ?? '',
+    permissionKey: 'tests.read',
+  })
+  const canManageTests = hasPermission(context.accesses, {
+    userId: user?.uid ?? '',
+    activeRoleId: context.activeRoleId ?? '',
+    teamId: context.activeTeamId ?? '',
+    permissionKey: 'tests.manage',
+  })
   const creationDisabledReason = !context.securityContextReady
     ? 'Contexte de sécurité non prêt'
     : !canWriteTests
@@ -60,9 +72,17 @@ export function TestsPage() {
     securityContextReady: context.securityContextReady,
   })
 
-  if (context.loading || definitions.isLoading || sessions.isLoading) {
+  if (context.loading || !context.securityContextReady) {
     return <main className="center">Chargement des tests…</main>
   }
+  if (!canReadTests)
+    return (
+      <main className="center error">
+        Vous n’avez pas accès aux tests dans ce contexte.
+      </main>
+    )
+  if (definitions.isPending || sessions.isPending)
+    return <main className="center">Chargement des tests…</main>
   if (context.error || definitions.isError || sessions.isError) {
     return (
       <main className="center error">
@@ -96,6 +116,11 @@ export function TestsPage() {
       <main className="dashboard">
         <h1>Protocoles de tests</h1>
         <p>Définitions accessibles dans votre contexte de travail actuel.</p>
+        {canManageTests ? (
+          <Link className="button-link secondary" to="/tests/admin">
+            Administrer le catalogue
+          </Link>
+        ) : null}
         <label className="session-date card">
           Date de la nouvelle session
           <input

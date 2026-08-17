@@ -9,6 +9,7 @@ import {
 } from '../hooks/useTestSession'
 import { metricColumns } from '../services/testEntryColumns'
 import { resolveTestSessionPageState } from './testSessionPageState'
+import { hasPermission } from '../services/permissionsService'
 
 export function TestSessionPage() {
   const { testSessionId = '' } = useParams()
@@ -27,6 +28,12 @@ export function TestSessionPage() {
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>(
     {},
   )
+  const canReadTests = hasPermission(app.accesses, {
+    userId: context.uid,
+    activeRoleId: context.roleId,
+    teamId: context.teamId,
+    permissionKey: 'tests.read',
+  })
 
   useEffect(() => {
     if (!data.results.data) return
@@ -44,6 +51,13 @@ export function TestSessionPage() {
       ),
     )
   }, [data.results.data])
+
+  if (!app.loading && app.securityContextReady && !canReadTests)
+    return (
+      <main className="center error">
+        Vous n’avez pas accès à cette session de test.
+      </main>
+    )
 
   const pageState = resolveTestSessionPageState({
     appError: app.error,

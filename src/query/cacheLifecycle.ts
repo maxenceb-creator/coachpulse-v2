@@ -62,7 +62,19 @@ const protectedContext = (queryKey: QueryKey) => {
       seasonId: queryKey[5],
     }
   }
-  if (queryKey[0] === 'testDefinitions' || queryKey[0] === 'testBenchmarks') {
+  if (
+    [
+      'testDefinitions',
+      'testBenchmarks',
+      'testSessions',
+      'testSession',
+      'testResults',
+      'testAnalysis',
+      'testCatalogue',
+      'testDefinitionAdmin',
+      'testBenchmarksAdmin',
+    ].includes(String(queryKey[0]))
+  ) {
     return {
       uid: queryKey[1],
       roleId: queryKey[2],

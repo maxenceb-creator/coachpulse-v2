@@ -105,6 +105,7 @@ export type TestMetricDefinition = {
   precision?: number
   minValue?: number
   maxValue?: number
+  order?: number
 }
 
 export type TestAttemptPolicy = {
@@ -118,12 +119,13 @@ export type TestDefinition = {
   code: string
   description?: string
   domain: 'TECHNICAL' | 'PHYSICAL'
-  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
+  status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
   version: number
   metrics: TestMetricDefinition[]
   attemptPolicy?: TestAttemptPolicy
   createdAt: Date
   updatedAt: Date
+  createdBy?: string
 }
 
 export type TestBenchmark = {
@@ -139,6 +141,7 @@ export type TestBenchmark = {
   status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
   createdAt: Date
   updatedAt: Date
+  createdBy?: string
 }
 
 export type TestSession = {

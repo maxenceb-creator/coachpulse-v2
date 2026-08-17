@@ -33,6 +33,18 @@ describe('schémas Tests PR06', () => {
     expect(testDefinitionSchema.parse(definition)).toEqual(definition)
   })
 
+  it.each(['ACTIVE', 'DRAFT', 'ARCHIVED'] as const)(
+    'accepte une définition PR09 au statut %s',
+    (status) => {
+      const value = {
+        ...definition,
+        status,
+        metrics: status === 'DRAFT' ? [] : definition.metrics,
+      }
+      expect(testDefinitionSchema.parse(value).status).toBe(status)
+    },
+  )
+
   it('refuse une métrique mal structurée', () => {
     expect(() =>
       testMetricDefinitionSchema.parse({

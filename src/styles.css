@@ -22,6 +22,13 @@ button {
   color: white;
   font-weight: 700;
 }
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.danger {
+  background: #a83232;
+}
 .secondary {
   background: #e5efeb;
   color: #154c40;
@@ -298,6 +305,42 @@ input {
 .error {
   color: #a32626;
 }
+.admin-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+}
+.admin-form select,
+.admin-form textarea {
+  width: 100%;
+  border: 1px solid #bdd0c9;
+  border-radius: 0.65rem;
+  padding: 0.75rem;
+  font: inherit;
+}
+.admin-form textarea {
+  min-height: 6rem;
+}
+.admin-table-wrap {
+  overflow-x: auto;
+}
+.metric-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.metric-editor fieldset {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid #dce7e2;
+  border-radius: 0.8rem;
+  padding: 1rem;
+}
+.admin-actions {
+  flex-wrap: wrap;
+  margin: 1.5rem 0;
+}
 @media (max-width: 760px) {
   .stats {
     grid-template-columns: 1fr 1fr;
@@ -312,7 +355,8 @@ input {
     grid-template-columns: 1fr;
   }
   .analysis-filters,
-  .analysis-stats {
+  .analysis-stats,
+  .metric-editor {
     grid-template-columns: 1fr;
   }
 }

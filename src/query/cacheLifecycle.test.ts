@@ -144,6 +144,36 @@ describe('cycle de vie du cache privé', () => {
     expect(client.getQueryData(u14Definitions)).toEqual(['sprint'])
   })
 
+  it('retire sessions, résultats, analyses et caches admin de la Team quittée', async () => {
+    const keys = [
+      queryKeys.tests.sessions('user-a', 'coach', 'u13', '2026'),
+      queryKeys.tests.session('user-a', 'coach', 'u13', '2026', 'session'),
+      queryKeys.tests.results('user-a', 'coach', 'u13', '2026', 'session'),
+      queryKeys.tests.analysisRoot('user-a', 'coach', 'u13', '2026'),
+      queryKeys.tests.catalogue('user-a', 'coach', 'u13', '2026'),
+      queryKeys.tests.definitionAdmin(
+        'user-a',
+        'coach',
+        'u13',
+        '2026',
+        'definition',
+      ),
+      queryKeys.tests.benchmarksAdmin(
+        'user-a',
+        'coach',
+        'u13',
+        '2026',
+        'definition',
+        1,
+      ),
+    ]
+    keys.forEach((key) => client.setQueryData(key, ['private']))
+
+    await removeTeamScopedQueries(client, 'user-a', 'coach', 'u13')
+
+    keys.forEach((key) => expect(client.getQueryData(key)).toBeUndefined())
+  })
+
   it('retire tout contexte protégé différent du securityContext confirmé', async () => {
     client.setQueryData(
       queryKeys.players.count('user-a', 'coach', 'u13', '2026'),

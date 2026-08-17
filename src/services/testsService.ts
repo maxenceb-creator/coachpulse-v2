@@ -278,6 +278,8 @@ export const createTestsService = (repository: TestsServiceRepository) => ({
     if (!definition) throw new TestsDomainError('TEST_DEFINITION_NOT_FOUND')
     if (definition.version !== input.testDefinitionVersion)
       throw new TestsDomainError('TEST_DEFINITION_VERSION_MISMATCH')
+    if (definition.status !== 'ACTIVE')
+      throw new TestsDomainError('TEST_DEFINITION_NOT_FOUND')
     const now = new Date()
     const session: TestSession = {
       ...input,

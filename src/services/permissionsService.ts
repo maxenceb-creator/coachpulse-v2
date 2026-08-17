@@ -12,14 +12,31 @@ export const hasPermission = (
     permissionKey: string
     now?: Date
   },
-) =>
-  all.some(
-    (a) =>
-      a.userId === r.userId &&
-      a.teamId === r.teamId &&
-      isAccessActive(a, r.now) &&
-      a.rolePermissions[r.activeRoleId]?.permissions.includes(r.permissionKey),
-  )
+) => resolveEffectivePermissions(all, r).includes(r.permissionKey)
+
+export const resolveEffectivePermissions = (
+  all: TeamAccess[],
+  context: {
+    userId: string
+    activeRoleId: string
+    teamId: string
+    now?: Date
+  },
+) => [
+  ...new Set(
+    all
+      .filter(
+        (access) =>
+          access.userId === context.userId &&
+          access.teamId === context.teamId &&
+          isAccessActive(access, context.now),
+      )
+      .flatMap(
+        (access) =>
+          access.rolePermissions[context.activeRoleId]?.permissions ?? [],
+      ),
+  ),
+]
 export const canAccessTeam = (
   all: TeamAccess[],
   uid: string,

@@ -457,10 +457,14 @@ PHYSICAL
 Statuts :
 
 ```text
+DRAFT
 ACTIVE
-INACTIVE
 ARCHIVED
 ```
+
+`INACTIVE` reste accepté uniquement à la lecture pour les documents PR06
+existants pendant la migration. Toute nouvelle définition utilise le cycle
+`DRAFT → ACTIVE → ARCHIVED`. Une version ACTIVE est structurellement immuable.
 
 Un protocole fortement modifié incrémente `version` et possède un identifiant de
 définition/version stable. Il ne réécrit jamais la version utilisée par
@@ -481,6 +485,7 @@ MetricDefinition {
   minValue?
   maxValue?
   required
+  order
 }
 ```
 

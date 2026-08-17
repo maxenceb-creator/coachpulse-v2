@@ -54,10 +54,11 @@ beforeEach(async () => {
       write('roles/analyst', { isActive: true }),
       write('roles/reader', { isActive: true }),
       write('roles/admin', { isActive: true }),
+      write('roles/manager', { isActive: true }),
       write('roles/inactive-role', { isActive: false }),
       write('users/user-a', {
         status: 'ACTIVE',
-        roleIds: ['coach', 'analyst', 'reader', 'inactive-role'],
+        roleIds: ['coach', 'analyst', 'reader', 'manager', 'inactive-role'],
         securityContext: securityContext('coach'),
       }),
       write('users/user-disabled', {
@@ -91,6 +92,10 @@ beforeEach(async () => {
           },
           analyst: { permissions: [], medicalAccessLevel: 'NONE' },
           reader: { permissions: ['tests.read'], medicalAccessLevel: 'NONE' },
+          manager: {
+            permissions: ['tests.read', 'tests.manage'],
+            medicalAccessLevel: 'NONE',
+          },
           'inactive-role': {
             permissions: ['players.read'],
             medicalAccessLevel: 'NONE',
@@ -264,7 +269,11 @@ describe('Security Rules du domaine Tests PR06', () => {
       ? testEnv.authenticatedContext(uid).firestore()
       : testEnv.unauthenticatedContext().firestore()
     return getDocs(
-      query(collection(db, 'testDefinitions'), where('status', '==', 'ACTIVE')),
+      query(
+        collection(db, 'testDefinitions'),
+        where('status', '==', 'ACTIVE'),
+        limit(50),
+      ),
     )
   }
 
@@ -293,6 +302,8 @@ describe('Security Rules du domaine Tests PR06', () => {
     const db = testEnv.authenticatedContext('user-a').firestore()
     await assertSucceeds(getDoc(doc(db, 'testDefinitions/juggling-v1')))
     await assertSucceeds(getDoc(doc(db, 'testBenchmarks/benchmark-a')))
+    await assertSucceeds(getDoc(doc(db, 'subCategories/subcat-a')))
+    await assertFails(getDoc(doc(db, 'subCategories/subcat-b')))
     await assertSucceeds(
       getDocs(
         query(
@@ -300,6 +311,8 @@ describe('Security Rules du domaine Tests PR06', () => {
           where('status', '==', 'ACTIVE'),
           where('subCategoryId', '==', 'subcat-a'),
           where('seasonId', '==', seasonId),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          limit(100),
         ),
       ),
     )
@@ -329,6 +342,200 @@ describe('Security Rules du domaine Tests PR06', () => {
       setDoc(doc(db, 'testBenchmarks/new-benchmark'), {
         status: 'ACTIVE',
       }),
+    )
+  })
+})
+
+describe('Security Rules administration Tests PR09', () => {
+  const definitionData = (overrides: Record<string, unknown> = {}) => ({
+    name: 'Agilité 5-10-5 DEV',
+    code: 'AGILITY_5_10_5',
+    domain: 'PHYSICAL',
+    status: 'DRAFT',
+    version: 1,
+    metrics: [],
+    createdBy: 'user-a',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  })
+
+  it('distingue tests.write de tests.manage pour les définitions', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await assertFails(
+      setDoc(doc(db, 'testDefinitions/test-agility-v1'), definitionData()),
+    )
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('manager'),
+      }),
+    )
+    await assertSucceeds(
+      setDoc(doc(db, 'testDefinitions/test-agility-v1'), definitionData()),
+    )
+  })
+
+  it('autorise activation valide puis interdit la mutation structurelle ACTIVE', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    await updateDoc(doc(db, 'users/user-a'), {
+      securityContext: securityContext('manager'),
+    })
+    const reference = doc(db, 'testDefinitions/test-agility-v1')
+    await setDoc(reference, definitionData())
+    await assertSucceeds(
+      updateDoc(reference, {
+        metrics: [
+          {
+            metricKey: 'HEIGHT',
+            label: 'Hauteur',
+            valueType: 'NUMBER',
+            unit: 'CENTIMETER',
+            direction: 'HIGHER_IS_BETTER',
+            required: true,
+            minValue: 0,
+            maxValue: 100,
+            precision: 0,
+            order: 0,
+          },
+        ],
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    expect((await getDoc(reference)).data()?.metrics[0]?.metricKey).toBe(
+      'HEIGHT',
+    )
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'ACTIVE',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      updateDoc(reference, {
+        name: 'Mutation interdite',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'ARCHIVED',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('réserve les benchmarks au manager et au contexte de sous-catégorie actif', async () => {
+    const db = testEnv.authenticatedContext('user-a').firestore()
+    const data = {
+      testDefinitionId: 'test-vertical-jump-v1',
+      testDefinitionVersion: 1,
+      metricKey: 'HEIGHT',
+      subCategoryId: 'subcat-a',
+      seasonId,
+      benchmarkLevel: 'TARGET',
+      targetValue: 35,
+      status: 'ACTIVE',
+      createdBy: 'user-a',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+    await assertFails(deleteDoc(doc(db, 'testBenchmarks/benchmark-a')))
+    await assertFails(setDoc(doc(db, 'testBenchmarks/new-target'), data))
+    await updateDoc(doc(db, 'users/user-a'), {
+      securityContext: securityContext('manager'),
+    })
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'testDefinitions/test-vertical-jump-v1'),
+        definitionData({
+          name: 'Détente verticale',
+          code: 'VERTICAL_JUMP',
+          metrics: [
+            {
+              metricKey: 'HEIGHT',
+              label: 'Hauteur',
+              valueType: 'NUMBER',
+              unit: 'CENTIMETER',
+              direction: 'HIGHER_IS_BETTER',
+              precision: 0,
+              minValue: 0,
+              maxValue: 100,
+              required: true,
+              order: 0,
+            },
+          ],
+        }),
+      ),
+    )
+    await assertSucceeds(setDoc(doc(db, 'testBenchmarks/new-target'), data))
+    await assertSucceeds(
+      updateDoc(doc(db, 'testBenchmarks/new-target'), {
+        status: 'ARCHIVED',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    const visibleBenchmarks = await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('testDefinitionId', '==', 'test-vertical-jump-v1'),
+          where('testDefinitionVersion', '==', 1),
+          where('seasonId', '==', seasonId),
+          where('subCategoryId', '==', 'subcat-a'),
+        ),
+      ),
+    )
+    expect(visibleBenchmarks.docs.map(({ id }) => id)).toContain('new-target')
+    expect(
+      visibleBenchmarks.docs.find(({ id }) => id === 'new-target')?.data()
+        .status,
+    ).toBe('ARCHIVED')
+    await assertSucceeds(deleteDoc(doc(db, 'testBenchmarks/new-target')))
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore()
+      expect(
+        (await getDoc(doc(admin, 'testBenchmarks/new-target'))).exists(),
+      ).toBe(false)
+      expect(
+        (
+          await getDoc(doc(admin, 'testDefinitions/test-vertical-jump-v1'))
+        ).exists(),
+      ).toBe(true)
+    })
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('testDefinitionId', '==', 'test-vertical-jump-v1'),
+          where('testDefinitionVersion', '==', 1),
+          where('seasonId', '==', seasonId),
+        ),
+      ),
+    )
+    await assertFails(
+      setDoc(doc(db, 'testBenchmarks/outside-target'), {
+        ...data,
+        subCategoryId: 'subcat-b',
+      }),
+    )
+    const forged = testEnv.authenticatedContext('user-forged-role').firestore()
+    await assertFails(setDoc(doc(forged, 'testBenchmarks/forged-target'), data))
+  })
+
+  it('refuse utilisateur désactivé et rôle falsifié', async () => {
+    const disabled = testEnv.authenticatedContext('user-disabled').firestore()
+    const forged = testEnv.authenticatedContext('user-forged-role').firestore()
+    await assertFails(
+      setDoc(
+        doc(disabled, 'testDefinitions/disabled-v1'),
+        definitionData({ createdBy: 'user-disabled' }),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(forged, 'testDefinitions/forged-v1'),
+        definitionData({ createdBy: 'user-forged-role' }),
+      ),
     )
   })
 })
@@ -796,6 +1003,26 @@ describe('Security Rules du socle et accès joueuses', () => {
           where('testDefinitionId', '==', 'juggling-v1'),
           where('testDefinitionVersion', '==', 1),
           limit(500),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('status', '==', 'ACTIVE'),
+          where('subCategoryId', '==', 'subcat-a'),
+          where('seasonId', '==', seasonId),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          limit(100),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'subCategories'),
+          where(documentId(), 'in', ['subcat-a']),
         ),
       ),
     )

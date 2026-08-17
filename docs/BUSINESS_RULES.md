@@ -310,6 +310,13 @@ Distance, matériel, barème, départ, nombre d'essais ou règles de performance
 ## BR-090 — Désactivation
 Un protocole obsolète devient inactif, pas supprimé.
 
+PR09 précise ce cycle sous la forme `DRAFT → ACTIVE → ARCHIVED`. `INACTIVE`
+reste un statut legacy lisible, mais n'est plus produit. Seul un DRAFT jamais
+utilisé est modifiable ou supprimable. Une version ACTIVE est structurellement
+immuable ; toute évolution des métriques, unités, directions, bornes ou du
+protocole crée une nouvelle version. Une `metricKey` utilisée n'est jamais
+renommée.
+
 ## BR-091 — Historique protégé
 Une TestDefinition utilisée historiquement n'est pas supprimée physiquement dans le fonctionnement normal.
 
@@ -1219,6 +1226,11 @@ Toute correction de données sportives rattachées à une saison clôturée néc
 
 ## BR-362 — TestBenchmark
 Les objectifs/références de tests sont représentés par `TestBenchmark`, relié au minimum à `testDefinitionId`, `metricKey` et `subCategoryId`.
+
+Un seul benchmark `ACTIVE` est autorisé par
+`seasonId + subCategoryId + testDefinitionId + testDefinitionVersion + metricKey + benchmarkLevel`.
+Son identifiant déterministe matérialise cette unicité et une cible à zéro reste
+valide lorsque les bornes de la métrique l'autorisent.
 
 ## BR-363 — Benchmark ≠ résultat
 Un TestBenchmark ne modifie jamais le TestResult brut.
