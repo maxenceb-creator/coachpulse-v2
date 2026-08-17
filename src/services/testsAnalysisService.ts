@@ -17,6 +17,7 @@ import {
   median,
 } from './testsAnalyticsService'
 import { TestsDomainError } from './testsService'
+import { ZodError } from 'zod'
 
 export type TestAnalysisContext = {
   userId: string
@@ -56,8 +57,15 @@ const runAnalysisOperation = async <T>(
       const failure = error as Error & { code?: string }
       console.error('[TestAnalysis DEV] Erreur', {
         ...details,
+        layer:
+          error instanceof ZodError
+            ? 'ZOD'
+            : failure.code
+              ? 'FIRESTORE'
+              : 'repository',
         code: failure.code ?? 'UNKNOWN',
         message: failure.message,
+        zodIssues: error instanceof ZodError ? error.issues : undefined,
         error,
       })
     }
@@ -292,7 +300,7 @@ export const createTestsAnalysisService = (repository: Repository) => ({
         sessionCount: sessions.length,
         resultCount: results.length,
         playerCount: players.length,
-        benchmarkFound: histories.some(({ benchmark }) => !!benchmark),
+        benchmarkCount: histories.filter(({ benchmark }) => !!benchmark).length,
       })
     return analysis
   },

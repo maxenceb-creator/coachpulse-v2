@@ -40,6 +40,12 @@ export function TestsPage() {
     teamId: context.activeTeamId ?? '',
     permissionKey: 'tests.write',
   })
+  const canReadTests = hasPermission(context.accesses, {
+    userId: user?.uid ?? '',
+    activeRoleId: context.activeRoleId ?? '',
+    teamId: context.activeTeamId ?? '',
+    permissionKey: 'tests.read',
+  })
   const canManageTests = hasPermission(context.accesses, {
     userId: user?.uid ?? '',
     activeRoleId: context.activeRoleId ?? '',
@@ -66,9 +72,17 @@ export function TestsPage() {
     securityContextReady: context.securityContextReady,
   })
 
-  if (context.loading || definitions.isLoading || sessions.isLoading) {
+  if (context.loading || !context.securityContextReady) {
     return <main className="center">Chargement des tests…</main>
   }
+  if (!canReadTests)
+    return (
+      <main className="center error">
+        Vous n’avez pas accès aux tests dans ce contexte.
+      </main>
+    )
+  if (definitions.isPending || sessions.isPending)
+    return <main className="center">Chargement des tests…</main>
   if (context.error || definitions.isError || sessions.isError) {
     return (
       <main className="center error">

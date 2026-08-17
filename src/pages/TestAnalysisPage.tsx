@@ -6,6 +6,15 @@ import { TestEvolutionChart } from '../components/TestEvolutionChart'
 import { useTestDefinitions } from '../hooks/useTestDefinitions'
 import type { TestHookContext } from '../hooks/useTestSession'
 import { useTestsAnalysis } from '../hooks/useTestsAnalysis'
+import { isTestsAnalysisQueryEnabled } from '../hooks/useTestsAnalysis'
+import {
+  hasPermission,
+  resolveEffectivePermissions,
+} from '../services/permissionsService'
+import {
+  resolveTestAnalysisPageState,
+  testAnalysisErrorMessage,
+} from './testAnalysisPageState'
 
 const trendLabel = {
   IMPROVED: 'Progression',
@@ -38,24 +47,93 @@ export function TestAnalysisPage() {
   const definition = definitions.data?.find(
     (item) => item.testDefinitionId === testDefinitionId,
   )
-  useEffect(() => {
-    if (
-      definition &&
-      !definition.metrics.some((item) => item.metricKey === metricKey)
-    )
-      setMetricKey(definition.metrics[0]?.metricKey ?? '')
-  }, [definition, metricKey])
+  const selectedMetricKey = definition?.metrics.some(
+    (item) => item.metricKey === metricKey,
+  )
+    ? metricKey
+    : (definition?.metrics[0]?.metricKey ?? '')
   const analysis = useTestsAnalysis(hookContext, {
     testDefinitionId,
     version: definition?.version ?? 0,
-    metricKey,
+    metricKey: selectedMetricKey,
+  })
+  const canReadTests = hasPermission(context.accesses, {
+    userId: hookContext.uid,
+    activeRoleId: hookContext.roleId,
+    teamId: hookContext.teamId,
+    permissionKey: 'tests.read',
+  })
+  const analysisEnabled = isTestsAnalysisQueryEnabled(hookContext, {
+    testDefinitionId,
+    version: definition?.version ?? 0,
+    metricKey: selectedMetricKey,
+  })
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.debug('[TestAnalysis DEV] Route', { params: { testDefinitionId } })
+    console.debug('[TestAnalysis DEV] Context', {
+      uid: hookContext.uid,
+      roleId: hookContext.roleId,
+      teamId: hookContext.teamId,
+      seasonId: hookContext.seasonId,
+      securityContextReady: hookContext.securityContextReady,
+      effectivePermissions: resolveEffectivePermissions(context.accesses, {
+        userId: hookContext.uid,
+        activeRoleId: hookContext.roleId,
+        teamId: hookContext.teamId,
+      }),
+    })
+  }, [
+    testDefinitionId,
+    hookContext.uid,
+    hookContext.roleId,
+    hookContext.teamId,
+    hookContext.seasonId,
+    hookContext.securityContextReady,
+    context.accesses,
+  ])
+
+  const pageState = resolveTestAnalysisPageState({
+    appLoading: context.loading,
+    appError: context.error,
+    securityContextReady: context.securityContextReady,
+    canReadTests,
+    testDefinitionId,
+    definitionsPending: definitions.isPending,
+    definitionsError: definitions.isError,
+    definition,
+    analysisEnabled,
+    analysisPending: analysis.isPending,
+    analysisFetching: analysis.fetchStatus === 'fetching',
+    analysisError: analysis.isError,
+    hasAnalysisData: !!analysis.data,
   })
 
-  if (context.loading || definitions.isLoading || analysis.isLoading)
+  if (
+    pageState === 'LOADING_CONTEXT' ||
+    pageState === 'LOADING_DEFINITIONS' ||
+    pageState === 'LOADING_ANALYSIS'
+  )
     return <main className="center">Chargement de l’analyse…</main>
-  if (context.error || definitions.isError || analysis.isError || !definition)
+  if (pageState === 'UNAUTHORIZED')
     return (
-      <main className="center error">Impossible de charger cette analyse.</main>
+      <main className="center error">
+        Vous n’avez pas accès à cette analyse.
+      </main>
+    )
+  if (pageState === 'NOT_FOUND')
+    return <main className="center error">Protocole introuvable.</main>
+  if (pageState === 'NO_METRICS')
+    return (
+      <main className="center error">
+        Ce protocole ne contient aucune métrique analysable.
+      </main>
+    )
+  if (pageState === 'ERROR' || !definition || !analysis.data)
+    return (
+      <main className="center error">
+        {testAnalysisErrorMessage(analysis.error ?? definitions.error)}
+      </main>
     )
   const allHistories = analysis.data?.histories ?? []
   const histories = playerId
@@ -79,7 +157,7 @@ export function TestAnalysisPage() {
           <label>
             Métrique
             <select
-              value={metricKey}
+              value={selectedMetricKey}
               onChange={(event) => setMetricKey(event.target.value)}
             >
               {definition.metrics.map((metric) => (

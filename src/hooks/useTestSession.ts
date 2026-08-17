@@ -7,6 +7,7 @@ import type {
   TestDefinition,
   TestSession,
 } from '../types/domain'
+import { hasPermission } from '../services/permissionsService'
 
 export type TestHookContext = {
   uid: string
@@ -25,7 +26,15 @@ const security = (context: TestHookContext) => ({
 })
 
 export const useTestSession = (context: TestHookContext, id: string) => {
-  const enabled = context.securityContextReady && !!id
+  const enabled =
+    context.securityContextReady &&
+    !!id &&
+    hasPermission(context.accesses, {
+      userId: context.uid,
+      activeRoleId: context.roleId,
+      teamId: context.teamId,
+      permissionKey: 'tests.read',
+    })
   const session = useQuery({
     queryKey: queryKeys.tests.session(
       context.uid,
@@ -178,7 +187,14 @@ export const useTestSessions = (context: TestHookContext) =>
         throw error
       }
     },
-    enabled: context.securityContextReady,
+    enabled:
+      context.securityContextReady &&
+      hasPermission(context.accesses, {
+        userId: context.uid,
+        activeRoleId: context.roleId,
+        teamId: context.teamId,
+        permissionKey: 'tests.read',
+      }),
   })
 
 export const useCreateTestSession = (context: TestHookContext) => {

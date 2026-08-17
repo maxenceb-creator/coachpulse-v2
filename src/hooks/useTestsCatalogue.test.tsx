@@ -4,6 +4,7 @@ import type { PropsWithChildren } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { testsCatalogueService } from '../services/appTestsService'
 import type { TestBenchmark, TestDefinition } from '../types/domain'
+import { queryKeys } from '../query/queryKeys'
 import {
   useTestDefinitionAdmin,
   useTestsCatalogueMutations,
@@ -114,6 +115,17 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
       ).toBe('HEIGHT'),
     )
 
+    const analysisKey = queryKeys.tests.analysis(
+      context.userId,
+      context.activeRoleId,
+      context.teamId,
+      context.seasonId,
+      definition.testDefinitionId,
+      1,
+      'HEIGHT',
+    )
+    client.setQueryData(analysisKey, { staleBenchmark: true })
+
     await act(() =>
       result.current.mutations.createBenchmark.mutateAsync({
         testDefinitionId: definition.testDefinitionId,
@@ -131,5 +143,6 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
         expect.objectContaining({ metricKey: 'HEIGHT', targetValue: 35 }),
       ]),
     )
+    expect(client.getQueryState(analysisKey)?.isInvalidated).toBe(true)
   })
 })

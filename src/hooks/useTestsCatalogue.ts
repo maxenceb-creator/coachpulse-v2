@@ -106,6 +106,15 @@ export const useTestsCatalogueMutations = (
   id?: string,
 ) => {
   const client = useQueryClient()
+  const invalidateAnalysis = () =>
+    client.invalidateQueries({
+      queryKey: queryKeys.tests.analysisRoot(
+        context.userId,
+        context.activeRoleId,
+        context.teamId,
+        context.seasonId,
+      ),
+    })
   const invalidate = async (definitionId?: string) => {
     await client.invalidateQueries({ queryKey: keys(context).catalogue })
     if (definitionId)
@@ -238,8 +247,8 @@ export const useTestsCatalogueMutations = (
           throw error
         }
       },
-      onSuccess: () =>
-        client.invalidateQueries({
+      onSuccess: async () => {
+        await client.invalidateQueries({
           queryKey: [
             'testBenchmarksAdmin',
             context.userId,
@@ -248,13 +257,15 @@ export const useTestsCatalogueMutations = (
             context.seasonId,
             id,
           ],
-        }),
+        })
+        await invalidateAnalysis()
+      },
     }),
     archiveBenchmark: useMutation({
       mutationFn: (benchmarkId: string) =>
         testsCatalogueService.archiveBenchmark(context, benchmarkId),
-      onSuccess: () =>
-        client.invalidateQueries({
+      onSuccess: async () => {
+        await client.invalidateQueries({
           queryKey: [
             'testBenchmarksAdmin',
             context.userId,
@@ -263,7 +274,9 @@ export const useTestsCatalogueMutations = (
             context.seasonId,
             id,
           ],
-        }),
+        })
+        await invalidateAnalysis()
+      },
     }),
     updateBenchmark: useMutation({
       mutationFn: (input: {
@@ -275,8 +288,8 @@ export const useTestsCatalogueMutations = (
           targetValue: input.targetValue,
           label: input.label,
         }),
-      onSuccess: () =>
-        client.invalidateQueries({
+      onSuccess: async () => {
+        await client.invalidateQueries({
           queryKey: [
             'testBenchmarksAdmin',
             context.userId,
@@ -285,7 +298,9 @@ export const useTestsCatalogueMutations = (
             context.seasonId,
             id,
           ],
-        }),
+        })
+        await invalidateAnalysis()
+      },
     }),
   }
 }

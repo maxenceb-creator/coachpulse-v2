@@ -269,7 +269,11 @@ describe('Security Rules du domaine Tests PR06', () => {
       ? testEnv.authenticatedContext(uid).firestore()
       : testEnv.unauthenticatedContext().firestore()
     return getDocs(
-      query(collection(db, 'testDefinitions'), where('status', '==', 'ACTIVE')),
+      query(
+        collection(db, 'testDefinitions'),
+        where('status', '==', 'ACTIVE'),
+        limit(50),
+      ),
     )
   }
 
@@ -307,6 +311,8 @@ describe('Security Rules du domaine Tests PR06', () => {
           where('status', '==', 'ACTIVE'),
           where('subCategoryId', '==', 'subcat-a'),
           where('seasonId', '==', seasonId),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          limit(100),
         ),
       ),
     )
@@ -984,6 +990,26 @@ describe('Security Rules du socle et accès joueuses', () => {
           where('testDefinitionId', '==', 'juggling-v1'),
           where('testDefinitionVersion', '==', 1),
           limit(500),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'testBenchmarks'),
+          where('status', '==', 'ACTIVE'),
+          where('subCategoryId', '==', 'subcat-a'),
+          where('seasonId', '==', seasonId),
+          where('testDefinitionId', '==', 'juggling-v1'),
+          limit(100),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'subCategories'),
+          where(documentId(), 'in', ['subcat-a']),
         ),
       ),
     )

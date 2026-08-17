@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
 import { testsService } from '../services/appTestsService'
 import type { TeamAccess } from '../types/domain'
+import { hasPermission } from '../services/permissionsService'
 
 export const useTestDefinitions = (context: {
   uid?: string
@@ -30,6 +31,12 @@ export const useTestDefinitions = (context: {
       !!context.roleId &&
       !!context.teamId &&
       !!context.seasonId &&
-      context.securityContextReady,
+      context.securityContextReady &&
+      hasPermission(context.accesses, {
+        userId: context.uid,
+        activeRoleId: context.roleId,
+        teamId: context.teamId,
+        permissionKey: 'tests.read',
+      }),
     staleTime: 5 * 60 * 1000,
   })

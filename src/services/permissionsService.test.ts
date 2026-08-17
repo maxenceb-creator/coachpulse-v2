@@ -3,6 +3,7 @@ import {
   hasPermission,
   isAccessActive,
   resolveAccessibleTeamAccesses,
+  resolveEffectivePermissions,
 } from './permissionsService'
 import type { TeamAccess } from '../types/domain'
 const a: TeamAccess = {
@@ -33,6 +34,14 @@ describe('permissions', () => {
         permissionKey: 'players.read',
       }),
     ).toBe(true))
+  it('résout une seule liste canonique de permissions effectives', () =>
+    expect(
+      resolveEffectivePermissions([a], {
+        userId: 'u',
+        teamId: 't',
+        activeRoleId: 'coach',
+      }),
+    ).toEqual(['players.read']))
   it('refuse un accès expiré', () =>
     expect(
       isAccessActive(
