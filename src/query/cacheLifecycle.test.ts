@@ -174,6 +174,38 @@ describe('cycle de vie du cache privé', () => {
     keys.forEach((key) => expect(client.getQueryData(key)).toBeUndefined())
   })
 
+  it('retire roster et historique joueuse lors du changement de Team', async () => {
+    const u13Roster = queryKeys.tests.playerRoster(
+      'user-a',
+      'coach',
+      'u13',
+      '2026',
+    )
+    const u13History = queryKeys.tests.playerHistory(
+      'user-a',
+      'coach',
+      'u13',
+      '2026',
+      'alice',
+    )
+    const u14History = queryKeys.tests.playerHistory(
+      'user-a',
+      'coach',
+      'u14',
+      '2026',
+      'lina',
+    )
+    client.setQueryData(u13Roster, ['alice'])
+    client.setQueryData(u13History, [32, 35, 38])
+    client.setQueryData(u14History, [40])
+
+    await removeTeamScopedQueries(client, 'user-a', 'coach', 'u13')
+
+    expect(client.getQueryData(u13Roster)).toBeUndefined()
+    expect(client.getQueryData(u13History)).toBeUndefined()
+    expect(client.getQueryData(u14History)).toEqual([40])
+  })
+
   it('retire tout contexte protégé différent du securityContext confirmé', async () => {
     client.setQueryData(
       queryKeys.players.count('user-a', 'coach', 'u13', '2026'),

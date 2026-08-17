@@ -86,7 +86,22 @@ export interface TestsAnalyticsRepository {
   getSubCategories(ids: string[]): Promise<SubCategory[]>
 }
 
-export const testsRepository: TestsRepository & TestsAnalyticsRepository = {
+export interface TestPlayerHistoryRepository extends TestsAnalyticsRepository {
+  listCompletedSessions(
+    teamId: string,
+    seasonId: string,
+  ): Promise<TestSession[]>
+  listResultsByPlayer(
+    playerId: string,
+    teamId: string,
+    seasonId: string,
+  ): Promise<TestResult[]>
+  listDefinitionsByIds(ids: string[]): Promise<TestDefinition[]>
+}
+
+export const testsRepository: TestsRepository &
+  TestsAnalyticsRepository &
+  TestPlayerHistoryRepository = {
   getActiveDefinitions: () =>
     many('testDefinitions', testDefinitionSchema, [
       where('status', '==', 'ACTIVE'),
@@ -137,6 +152,38 @@ export const testsRepository: TestsRepository & TestsAnalyticsRepository = {
       orderBy('date', 'desc'),
       limit(100),
     ]),
+  listCompletedSessions: (teamId, seasonId) =>
+    many('testSessions', testSessionSchema, [
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      where('status', '==', 'COMPLETED'),
+      orderBy('date', 'desc'),
+      limit(200),
+    ]),
+  listResultsByPlayer: (playerId, teamId, seasonId) =>
+    many('testResults', testResultSchema, [
+      where('playerId', '==', playerId),
+      where('teamId', '==', teamId),
+      where('seasonId', '==', seasonId),
+      limit(500),
+    ]),
+  listDefinitionsByIds: async (ids) => {
+    const uniqueIds = [...new Set(ids)]
+    if (!uniqueIds.length) return []
+    const groups = Array.from(
+      { length: Math.ceil(uniqueIds.length / 30) },
+      (_, index) => uniqueIds.slice(index * 30, index * 30 + 30),
+    )
+    return (
+      await Promise.all(
+        groups.map((group) =>
+          many('testDefinitions', testDefinitionSchema, [
+            where(documentId(), 'in', group),
+          ]),
+        ),
+      )
+    ).flat()
+  },
   listResultsByDefinition: (
     teamId,
     seasonId,

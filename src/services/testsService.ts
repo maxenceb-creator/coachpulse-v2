@@ -58,6 +58,7 @@ export class TestsDomainError extends Error {
       | 'TEST_SESSION_DELETE_TOO_LARGE'
       | 'TEST_DEFINITION_VERSION_MISMATCH'
       | 'TEST_CONTEXT_MISMATCH'
+      | 'PLAYER_NOT_FOUND'
       | 'PLAYER_NOT_ELIGIBLE'
       | 'METRIC_NOT_FOUND'
       | 'METRIC_VALUE_OUT_OF_RANGE'

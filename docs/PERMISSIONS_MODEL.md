@@ -917,6 +917,12 @@ tests.read SELF
 
 Les droits exacts seront configurables.
 
+Pour l'historique individuel du domaine Tests, `tests.read` autorise les
+lectures minimales de l'identité sportive et des affectations nécessaires au
+sélecteur de joueuses. Ces lectures restent obligatoirement limitées au
+`playerId`, à la Team et à la saison du contexte de sécurité actif ; elles ne
+confèrent pas un accès général au module Joueuses.
+
 ---
 
 # 70. Exemple Kiné
@@ -1137,12 +1143,12 @@ Décisions figées :
 - exports limités ;
 - AuditLog intégré dès la fondation.
 
-
 ---
 
 # Addendum de cohérence V1.1
 
 ## Saison clôturée
+
 La correction de données sportives d'une saison `CLOSED` requiert :
 
 ```text
@@ -1152,6 +1158,7 @@ history.correctClosedSeason
 Cette permission est évaluée dans le contexte Team concerné et ne permet pas de contourner les invariants métier.
 
 ## Benchmarks Tests
+
 La gestion des `TestBenchmark` est initialement couverte par :
 
 ```text

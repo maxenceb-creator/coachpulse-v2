@@ -46,6 +46,14 @@ const startsWith = (queryKey: QueryKey, prefix: QueryKey) =>
   prefix.every((value, index) => queryKey[index] === value)
 
 const protectedContext = (queryKey: QueryKey) => {
+  if (queryKey[0] === 'tests') {
+    return {
+      uid: queryKey[2],
+      roleId: queryKey[3],
+      teamId: queryKey[4],
+      seasonId: queryKey[5],
+    }
+  }
   if (queryKey[0] === 'assignments') {
     return {
       uid: queryKey[1],

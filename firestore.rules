@@ -339,7 +339,10 @@ service cloud.firestore {
 
     match /playerTeamAssignments/{assignmentId} {
       allow read: if resource.data.status == 'ACTIVE'
-        && canInSecurityContext(resource.data.teamId, resource.data.seasonId, 'players.read');
+        && (
+          canInSecurityContext(resource.data.teamId, resource.data.seasonId, 'players.read')
+          || canInSecurityContext(resource.data.teamId, resource.data.seasonId, 'tests.read')
+        );
     }
 
     match /playerAccessScopes/{scopeId} {
@@ -348,10 +351,17 @@ service cloud.firestore {
 
     match /players/{playerId} {
       allow read: if resource.data.status == 'ACTIVE'
-        && canInSecurityContext(
-          user().data.securityContext.activeTeamId,
-          user().data.securityContext.activeSeasonId,
-          'players.read'
+        && (
+          canInSecurityContext(
+            user().data.securityContext.activeTeamId,
+            user().data.securityContext.activeSeasonId,
+            'players.read'
+          )
+          || canInSecurityContext(
+            user().data.securityContext.activeTeamId,
+            user().data.securityContext.activeSeasonId,
+            'tests.read'
+          )
         )
         && activePlayerScope(
           playerId,

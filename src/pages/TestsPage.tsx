@@ -121,6 +121,9 @@ export function TestsPage() {
             Administrer le catalogue
           </Link>
         ) : null}
+        <Link className="button-link secondary" to="/tests/players">
+          Historique par joueuse
+        </Link>
         <label className="session-date card">
           Date de la nouvelle session
           <input

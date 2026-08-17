@@ -14,6 +14,7 @@ import { AppContext } from './AppContext'
 import { TestsCataloguePage } from '../pages/TestsCataloguePage'
 import { TestDefinitionAdminPage } from '../pages/TestDefinitionAdminPage'
 import { TestsRouteErrorBoundary } from '../components/TestsRouteErrorBoundary'
+import { TestPlayerHistoryPage } from '../pages/TestPlayerHistoryPage'
 function Guard() {
   const { user, loading } = useAuth()
   if (loading)
@@ -45,6 +46,11 @@ const router = createBrowserRouter([
       {
         path: '/tests/admin/:testDefinitionId',
         element: <TestDefinitionAdminPage />,
+        errorElement: <TestsRouteErrorBoundary />,
+      },
+      {
+        path: '/tests/players/:playerId?',
+        element: <TestPlayerHistoryPage />,
         errorElement: <TestsRouteErrorBoundary />,
       },
       {

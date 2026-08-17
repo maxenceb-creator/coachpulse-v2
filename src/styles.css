@@ -3,6 +3,34 @@
   color: #10231f;
   background: #f2f6f4;
 }
+
+.history-filters,
+.metric-summary {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.history-filters label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.metric-summary div {
+  border-left: 3px solid var(--accent, #5b6ee1);
+  padding-left: 0.75rem;
+}
+
+.metric-summary dt {
+  color: #667085;
+}
+.metric-summary dd {
+  font-weight: 700;
+  margin: 0.2rem 0 0;
+}
+.history-list {
+  line-height: 1.8;
+}
 * {
   box-sizing: border-box;
 }
