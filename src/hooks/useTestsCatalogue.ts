@@ -134,6 +134,44 @@ export const useTestsCatalogueMutations = (
       ),
       { definition },
     )
+  const runBenchmarkMutation = async <T>(
+    operation: 'update' | 'archive' | 'delete',
+    benchmarkId: string,
+    mutation: () => Promise<T>,
+  ) => {
+    if (import.meta.env.DEV)
+      console.debug('[TestBenchmarkAdmin DEV] Mutation demandée', {
+        operation,
+        benchmarkId,
+        uid: context.userId,
+        activeRoleId: context.activeRoleId,
+        teamId: context.teamId,
+        seasonId: context.seasonId,
+        categoryId: context.categoryId,
+        securityContextReady: context.securityContextReady,
+        canManageTests: canManageTests(context.accesses, context),
+      })
+    try {
+      return await mutation()
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        const failure = error as Error & { code?: string }
+        console.error('[TestBenchmarkAdmin DEV] Mutation échouée', {
+          operation,
+          benchmarkId,
+          layer:
+            error instanceof TestsCatalogueError
+              ? 'service'
+              : failure.code
+                ? 'FIRESTORE'
+                : 'repository',
+          code: failure.code ?? 'UNKNOWN',
+          message: failure.message,
+        })
+      }
+      throw error
+    }
+  }
   const invalidateAnalysis = () =>
     client.invalidateQueries({
       queryKey: queryKeys.tests.analysisRoot(
@@ -303,7 +341,9 @@ export const useTestsCatalogueMutations = (
     }),
     archiveBenchmark: useMutation({
       mutationFn: (benchmarkId: string) =>
-        testsCatalogueService.archiveBenchmark(context, benchmarkId),
+        runBenchmarkMutation('archive', benchmarkId, () =>
+          testsCatalogueService.archiveBenchmark(context, benchmarkId),
+        ),
       onSuccess: async (archived) => {
         updateBenchmarkCache((items) =>
           items.map((item) =>
@@ -320,10 +360,12 @@ export const useTestsCatalogueMutations = (
         targetValue: number
         label?: string
       }) =>
-        testsCatalogueService.updateBenchmark(context, input.benchmarkId, {
-          targetValue: input.targetValue,
-          label: input.label,
-        }),
+        runBenchmarkMutation('update', input.benchmarkId, () =>
+          testsCatalogueService.updateBenchmark(context, input.benchmarkId, {
+            targetValue: input.targetValue,
+            label: input.label,
+          }),
+        ),
       onSuccess: async (updated) => {
         updateBenchmarkCache((items) =>
           items.map((item) =>
@@ -336,7 +378,9 @@ export const useTestsCatalogueMutations = (
     }),
     deleteBenchmark: useMutation({
       mutationFn: (benchmarkId: string) =>
-        testsCatalogueService.deleteBenchmark(context, benchmarkId),
+        runBenchmarkMutation('delete', benchmarkId, () =>
+          testsCatalogueService.deleteBenchmark(context, benchmarkId),
+        ),
       onSuccess: async (_, benchmarkId) => {
         updateBenchmarkCache((items) =>
           items.filter(

@@ -358,6 +358,44 @@ describe('testsCatalogueService', () => {
     expect(repo.deleteDefinition).not.toHaveBeenCalled()
   })
 
+  it('met à jour puis archive un benchmark ACTIVE du scope actif', async () => {
+    const repo = repository()
+    const existing = {
+      testBenchmarkId: 'benchmark-u13-metric-a-target',
+      testDefinitionId: 'test-generic-v1',
+      testDefinitionVersion: 1,
+      metricKey: 'METRIC_A',
+      subCategoryId: 'u13',
+      seasonId: 'season',
+      benchmarkLevel: 'TARGET' as const,
+      targetValue: 35,
+      status: 'ACTIVE' as const,
+      createdBy: 'user',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    vi.mocked(repo.getBenchmark).mockResolvedValue(existing)
+    const service = createTestsCatalogueService(repo)
+
+    await expect(
+      service.updateBenchmark(context(), existing.testBenchmarkId, {
+        targetValue: 45,
+      }),
+    ).resolves.toMatchObject({ targetValue: 45, status: 'ACTIVE' })
+    expect(repo.updateBenchmark).toHaveBeenCalledWith(
+      existing.testBenchmarkId,
+      { targetValue: 45 },
+    )
+
+    await expect(
+      service.archiveBenchmark(context(), existing.testBenchmarkId),
+    ).resolves.toMatchObject({ targetValue: 35, status: 'ARCHIVED' })
+    expect(repo.updateBenchmark).toHaveBeenCalledWith(
+      existing.testBenchmarkId,
+      { status: 'ARCHIVED' },
+    )
+  })
+
   it('refuse de supprimer un benchmark sans tests.manage ou hors scope', async () => {
     const repo = repository()
     vi.mocked(repo.getBenchmark).mockResolvedValue({
