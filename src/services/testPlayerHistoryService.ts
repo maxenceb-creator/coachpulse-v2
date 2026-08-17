@@ -58,7 +58,7 @@ const comparable = (point: ReturnType<typeof buildHistoryPoints>[number]) => ({
 export const summarizeMetric = (
   metric: TestMetricDefinition,
   points: ReturnType<typeof buildHistoryPoints>,
-  benchmark?: Parameters<typeof compareToBenchmark>[1],
+  benchmarks: TestBenchmark[] = [],
 ) => {
   const first = points[0]
   const latest = getLatestComparableResult(points)
@@ -71,14 +71,15 @@ export const summarizeMetric = (
     average: mean(points.map(({ value }) => value)),
     count: points.length,
     evolution:
-      first && latest
+      points.length > 1 && first && latest
         ? compareMetricResults(comparable(first), comparable(latest), metric)
         : undefined,
-    benchmark,
-    benchmarkComparison:
-      latest && benchmark
+    benchmarks: benchmarks.map((benchmark) => ({
+      benchmark,
+      comparison: latest
         ? compareToBenchmark(latest.value, benchmark, metric)
         : undefined,
+    })),
   }
 }
 
@@ -118,7 +119,7 @@ export const buildPlayerHistory = ({
             summarizeMetric(
               metric,
               buildHistoryPoints(definitionResults, sessionsById, metric),
-              benchmarks.find(
+              benchmarks.filter(
                 (benchmark) =>
                   benchmark.testDefinitionId === definition.testDefinitionId &&
                   benchmark.testDefinitionVersion === definition.version &&
@@ -198,120 +199,5 @@ export const createTestPlayerHistoryService = (repository: Repository) => ({
       subCategoryId,
       seasonId: context.seasonId,
     })
-  },
-
-  async getPlayerHistory(context: TestPlayerHistoryContext, playerId: string) {
-    requireRead(context)
-    const diagnostic = {
-      playerId,
-      teamId: context.teamId,
-      seasonId: context.seasonId,
-      roleId: context.activeRoleId,
-      securityContextReady: true,
-    }
-    if (import.meta.env.DEV)
-      console.debug('[TestPlayerHistory DEV] Query', {
-        ...diagnostic,
-        constraints: {
-          testResults: {
-            playerId,
-            teamId: context.teamId,
-            seasonId: context.seasonId,
-            limit: 500,
-          },
-          testSessions: {
-            teamId: context.teamId,
-            seasonId: context.seasonId,
-            status: 'COMPLETED',
-            orderBy: 'date desc',
-            limit: 200,
-          },
-        },
-      })
-    try {
-      const assignments = await repository.assignmentsForTeam(
-        context.teamId,
-        context.seasonId,
-      )
-      const inScope = assignments.some(
-        (assignment) =>
-          assignment.playerId === playerId &&
-          isAssignmentEffective(assignment, new Date()),
-      )
-      if (!inScope) throw new TestsDomainError('PERMISSION_DENIED')
-      const [player] = await repository.activePlayers([playerId])
-      if (!player) throw new TestsDomainError('PLAYER_NOT_FOUND')
-      const [results, sessions] = await Promise.all([
-        repository.listResultsByPlayer(
-          playerId,
-          context.teamId,
-          context.seasonId,
-        ),
-        repository.listCompletedSessions(context.teamId, context.seasonId),
-      ])
-      const sessionsById = new Map(
-        sessions.map((session) => [session.testSessionId, session]),
-      )
-      const completedResults = results.filter((result) =>
-        sessionsById.has(result.testSessionId),
-      )
-      const definitionIds = completedResults.map(
-        ({ testDefinitionId }) => testDefinitionId,
-      )
-      const definitions = await repository.listDefinitionsByIds(definitionIds)
-      const categoryId = sessions.find((session) =>
-        completedResults.some(
-          ({ testSessionId }) => testSessionId === session.testSessionId,
-        ),
-      )?.categoryId
-      const category = categoryId
-        ? await repository.getCategory(categoryId)
-        : null
-      const subCategories = category
-        ? await repository.getSubCategories(category.subCategoryIds)
-        : []
-      const subCategory = subCategories.find(
-        ({ birthYearRule }) =>
-          birthYearRule === player.birthDate.getUTCFullYear(),
-      )
-      const benchmarks = subCategory
-        ? await repository.getBenchmarks({
-            subCategoryId: subCategory.subCategoryId,
-            seasonId: context.seasonId,
-          })
-        : []
-      const history = buildPlayerHistory({
-        player,
-        subCategory,
-        results: completedResults,
-        sessions,
-        definitions,
-        benchmarks,
-      })
-      if (import.meta.env.DEV)
-        console.debug('[TestPlayerHistory DEV] Success', {
-          ...diagnostic,
-          sessionCount: sessionsById.size,
-          resultCount: completedResults.length,
-          definitionCount: definitions.length,
-        })
-      return history
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        const failure = error as Error & { code?: string }
-        console.error('[TestPlayerHistory DEV] Error', {
-          ...diagnostic,
-          layer:
-            error instanceof TestsDomainError
-              ? 'service'
-              : failure.code
-                ? 'FIRESTORE'
-                : 'repository',
-          code: failure.code ?? 'UNKNOWN',
-          message: failure.message,
-        })
-      }
-      throw error
-    }
   },
 })

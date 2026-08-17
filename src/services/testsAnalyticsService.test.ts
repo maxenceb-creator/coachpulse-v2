@@ -54,7 +54,28 @@ describe('testsAnalyticsService', () => {
     )
     expect(comparison.trend).toBe('IMPROVED')
     expect(comparison.relativeChange).toBeUndefined()
+    expect(comparison.performanceRelativeChange).toBeUndefined()
   })
+
+  it.each([
+    ['HIGHER_IS_BETTER', 32, 38, 18.75, 'IMPROVED'],
+    ['HIGHER_IS_BETTER', 38, 32, -15.789473684210526, 'REGRESSED'],
+    ['HIGHER_IS_BETTER', 38, 38, 0, 'STABLE'],
+    ['LOWER_IS_BETTER', 3.7, 3.5, 5.40540540540541, 'IMPROVED'],
+    ['LOWER_IS_BETTER', 3.5, 3.7, -5.71428571428572, 'REGRESSED'],
+    ['LOWER_IS_BETTER', 3.5, 3.5, 0, 'STABLE'],
+  ] as const)(
+    'calcule la progression sportive %s de %s vers %s',
+    (direction, before, after, progression, trend) => {
+      const comparison = compareMetricResults(
+        result(before),
+        result(after),
+        metric(direction),
+      )
+      expect(comparison.performanceRelativeChange).toBeCloseTo(progression)
+      expect(comparison.trend).toBe(trend)
+    },
+  )
 
   it('interprète les benchmarks selon leur direction', () => {
     const benchmark = {

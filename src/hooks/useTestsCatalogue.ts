@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
+import { invalidateTestPlayerHistory } from '../query/testPlayerHistoryCache'
 import { testsCatalogueService } from '../services/appTestsService'
 import type {
   CatalogueSecurityContext,
@@ -192,7 +193,20 @@ export const useTestsCatalogueMutations = (
         benchmarkId,
         step: 'invalidation start',
       })
-    void Promise.all([refreshBenchmarks(), invalidateAnalysis()])
+    void Promise.all([
+      refreshBenchmarks(),
+      invalidateAnalysis(),
+      invalidateTestPlayerHistory(
+        client,
+        {
+          uid: context.userId,
+          roleId: context.activeRoleId,
+          teamId: context.teamId,
+          seasonId: context.seasonId,
+        },
+        { benchmarks: true },
+      ),
+    ])
       .then(() => {
         if (import.meta.env.DEV)
           console.debug('[TestBenchmarkMutation DEV]', {

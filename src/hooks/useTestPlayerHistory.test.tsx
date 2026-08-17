@@ -140,6 +140,9 @@ describe('useTestPlayerHistory cache performance', () => {
     )
     rerender({ playerId: 'emma' })
     expect(hook.current.data).toBeUndefined()
+    await waitFor(() =>
+      expect(mocks.listPlayerResults).toHaveBeenCalledTimes(2),
+    )
     resolveEmma([result('emma', 'u13')])
     await waitFor(() => expect(hook.current.data?.player.playerId).toBe('emma'))
 
@@ -149,6 +152,23 @@ describe('useTestPlayerHistory cache performance', () => {
     expect(mocks.getTaxonomy).toHaveBeenCalledTimes(1)
     expect(mocks.getDefinition).toHaveBeenCalledTimes(1)
     expect(mocks.getBenchmarks).toHaveBeenCalledTimes(1)
+
+    rerender({ playerId: 'alice' })
+    await waitFor(() =>
+      expect(hook.current.data?.player.playerId).toBe('alice'),
+    )
+    expect(mocks.listPlayerResults).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuse un playerId hors roster avant toute lecture de ses résultats', async () => {
+    const { result: hook } = renderHook(
+      () => useTestPlayerHistory(context('u13'), 'intruder'),
+      { wrapper },
+    )
+
+    await waitFor(() => expect(hook.current.isError).toBe(true))
+    expect(mocks.listCompletedSessions).toHaveBeenCalledTimes(1)
+    expect(mocks.listPlayerResults).not.toHaveBeenCalled()
   })
 
   it('recharge les données communes lorsque la Team change', async () => {

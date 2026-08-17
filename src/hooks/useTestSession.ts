@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
+import { invalidateTestPlayerHistory } from '../query/testPlayerHistoryCache'
 import { testsService } from '../services/appTestsService'
 import type {
   Player,
@@ -106,34 +107,43 @@ export const useSaveTestResults = (context: TestHookContext) => {
         input.drafts,
         input.complete,
       ),
-    onSuccess: (_, input) => {
-      void client.invalidateQueries({
-        queryKey: queryKeys.tests.results(
-          context.uid,
-          context.roleId,
-          context.teamId,
-          context.seasonId,
-          input.session.testSessionId,
-        ),
-      })
-      if (input.complete)
-        void client.invalidateQueries({
-          queryKey: queryKeys.tests.session(
+    onSuccess: async (savedResults, input) => {
+      const invalidations: Promise<unknown>[] = [
+        client.invalidateQueries({
+          queryKey: queryKeys.tests.results(
             context.uid,
             context.roleId,
             context.teamId,
             context.seasonId,
             input.session.testSessionId,
           ),
-        })
-      void client.invalidateQueries({
-        queryKey: queryKeys.tests.analysisRoot(
-          context.uid,
-          context.roleId,
-          context.teamId,
-          context.seasonId,
-        ),
-      })
+        }),
+        client.invalidateQueries({
+          queryKey: queryKeys.tests.analysisRoot(
+            context.uid,
+            context.roleId,
+            context.teamId,
+            context.seasonId,
+          ),
+        }),
+        invalidateTestPlayerHistory(client, context, {
+          playerIds: savedResults.map(({ playerId }) => playerId),
+          sessions: input.complete,
+        }),
+      ]
+      if (input.complete)
+        invalidations.push(
+          client.invalidateQueries({
+            queryKey: queryKeys.tests.session(
+              context.uid,
+              context.roleId,
+              context.teamId,
+              context.seasonId,
+              input.session.testSessionId,
+            ),
+          }),
+        )
+      await Promise.all(invalidations)
     },
   })
 }
@@ -212,15 +222,19 @@ export const useCreateTestSession = (context: TestHookContext) => {
         teamId: context.teamId,
         seasonId: context.seasonId,
       }),
-    onSuccess: () =>
-      client.invalidateQueries({
-        queryKey: queryKeys.tests.sessions(
-          context.uid,
-          context.roleId,
-          context.teamId,
-          context.seasonId,
-        ),
-      }),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({
+          queryKey: queryKeys.tests.sessions(
+            context.uid,
+            context.roleId,
+            context.teamId,
+            context.seasonId,
+          ),
+        }),
+        invalidateTestPlayerHistory(client, context, { sessions: true }),
+      ])
+    },
   })
 }
 
@@ -239,7 +253,7 @@ export const useDeleteTestSession = (context: TestHookContext) => {
         testSessionId,
         context.seasonId,
       ),
-    onSuccess: (deleted) => {
+    onSuccess: async (deleted) => {
       client.setQueryData<TestSession[]>(sessionsKey, (sessions = []) =>
         sessions.filter(
           ({ testSessionId }) => testSessionId !== deleted.testSessionId,
@@ -265,15 +279,21 @@ export const useDeleteTestSession = (context: TestHookContext) => {
         ),
         exact: true,
       })
-      void client.invalidateQueries({ queryKey: sessionsKey, exact: true })
-      void client.invalidateQueries({
-        queryKey: queryKeys.tests.analysisRoot(
-          context.uid,
-          context.roleId,
-          context.teamId,
-          context.seasonId,
-        ),
-      })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: sessionsKey, exact: true }),
+        client.invalidateQueries({
+          queryKey: queryKeys.tests.analysisRoot(
+            context.uid,
+            context.roleId,
+            context.teamId,
+            context.seasonId,
+          ),
+        }),
+        invalidateTestPlayerHistory(client, context, {
+          playerIds: [],
+          sessions: true,
+        }),
+      ])
     },
     onError: (error, testSessionId) => {
       if (!import.meta.env.DEV) return

@@ -63,6 +63,10 @@ export const compareMetricResults = (
     delta,
     directionalDelta,
     relativeChange: relativeChange(previous.value, current.value),
+    performanceRelativeChange:
+      previous.value === 0
+        ? undefined
+        : (directionalDelta / Math.abs(previous.value)) * 100,
     trend:
       directionalDelta > 0
         ? 'IMPROVED'

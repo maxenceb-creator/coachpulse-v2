@@ -7,6 +7,7 @@ import type {
   TestSession,
 } from '../types/domain'
 import {
+  buildPlayerHistory,
   createTestPlayerHistoryService,
   summarizeMetric,
 } from './testPlayerHistoryService'
@@ -82,6 +83,19 @@ const accesses: TeamAccess[] = [
     },
   },
 ]
+const benchmark = {
+  testBenchmarkId: 'b',
+  testDefinitionId: definition.testDefinitionId,
+  testDefinitionVersion: 1,
+  metricKey: 'HEIGHT',
+  subCategoryId: 'u13',
+  seasonId: 'season-2026',
+  benchmarkLevel: 'TARGET' as const,
+  targetValue: 35,
+  status: 'ACTIVE' as const,
+  createdAt: now,
+  updatedAt: now,
+}
 const context = {
   userId: 'coach',
   activeRoleId: 'coach',
@@ -126,43 +140,34 @@ const repository = (
       updatedAt: now,
     },
   ]),
-  getBenchmarks: vi.fn().mockResolvedValue([
-    {
-      testBenchmarkId: 'b',
-      testDefinitionId: definition.testDefinitionId,
-      testDefinitionVersion: 1,
-      metricKey: 'HEIGHT',
-      subCategoryId: 'u13',
-      seasonId: 'season-2026',
-      benchmarkLevel: 'TARGET',
-      targetValue: 35,
-      status: 'ACTIVE',
-      createdAt: now,
-      updatedAt: now,
-    },
-  ]),
+  getBenchmarks: vi.fn().mockResolvedValue([benchmark]),
 })
 
 describe('testPlayerHistoryService', () => {
-  it('retourne un historique vide réel', async () => {
-    const data = await createTestPlayerHistoryService(
-      repository(),
-    ).getPlayerHistory(context, 'alice')
+  it('retourne un historique vide réel', () => {
+    const data = buildPlayerHistory({
+      player,
+      results: [],
+      sessions: [],
+      definitions: [],
+      benchmarks: [],
+    })
     expect(data.histories).toEqual([])
   })
 
-  it('calcule première, dernière, meilleure, moyenne, progression et benchmark', async () => {
+  it('calcule première, dernière, meilleure, moyenne, progression et benchmark', () => {
     const sessions = [
       session('s1', '2026-08-12'),
       session('s2', '2026-09-05'),
       session('s3', '2026-10-10'),
     ]
-    const data = await createTestPlayerHistoryService(
-      repository(
-        sessions,
-        sessions.map((item, index) => result(item, [32, 35, 38][index])),
-      ),
-    ).getPlayerHistory(context, 'alice')
+    const data = buildPlayerHistory({
+      player,
+      sessions,
+      results: sessions.map((item, index) => result(item, [32, 35, 38][index])),
+      definitions: [definition],
+      benchmarks: [benchmark],
+    })
     const summary = data.histories[0].metrics[0]
     expect({
       first: summary.first?.value,
@@ -174,9 +179,10 @@ describe('testPlayerHistoryService', () => {
     expect(summary.evolution).toMatchObject({
       delta: 6,
       relativeChange: 18.75,
+      performanceRelativeChange: 18.75,
       trend: 'IMPROVED',
     })
-    expect(summary.benchmarkComparison).toMatchObject({
+    expect(summary.benchmarks[0].comparison).toMatchObject({
       directionalDelta: 3,
       status: 'ABOVE_TARGET',
     })
@@ -202,46 +208,94 @@ describe('testPlayerHistoryService', () => {
     ).toBe('STABLE')
   })
 
-  it('sépare les versions et plusieurs protocoles', async () => {
+  it('ne calcule pas une évolution avec une seule mesure', () => {
+    const point = {
+      session: session('single', '2026-08-01'),
+      result: result(session('single', '2026-08-01'), 32),
+      metricKey: 'HEIGHT',
+      unit: 'CENTIMETER' as const,
+      value: 32,
+    }
+    expect(summarizeMetric(metric, [point]).evolution).toBeUndefined()
+  })
+
+  it('conserve tous les niveaux de benchmark sans priorité implicite', () => {
+    const points = [
+      {
+        session: session('single', '2026-08-01'),
+        result: result(session('single', '2026-08-01'), 38),
+        metricKey: 'HEIGHT',
+        unit: 'CENTIMETER' as const,
+        value: 38,
+      },
+    ]
+    const good = {
+      ...benchmark,
+      testBenchmarkId: 'good',
+      benchmarkLevel: 'GOOD' as const,
+      targetValue: 37,
+    }
+    expect(
+      summarizeMetric(metric, points, [benchmark, good]).benchmarks.map(
+        ({ benchmark: item }) => item.benchmarkLevel,
+      ),
+    ).toEqual(['TARGET', 'GOOD'])
+  })
+
+  it('recalcule la comparaison avec un benchmark modifié', () => {
+    const point = {
+      session: session('single', '2026-08-01'),
+      result: result(session('single', '2026-08-01'), 38),
+      metricKey: 'HEIGHT',
+      unit: 'CENTIMETER' as const,
+      value: 38,
+    }
+    expect(
+      summarizeMetric(metric, [point], [benchmark]).benchmarks[0].comparison
+        ?.directionalDelta,
+    ).toBe(3)
+    expect(
+      summarizeMetric(metric, [point], [{ ...benchmark, targetValue: 40 }])
+        .benchmarks[0].comparison?.directionalDelta,
+    ).toBe(-2)
+  })
+
+  it('sépare les versions et plusieurs protocoles', () => {
     const v2 = { ...definition, testDefinitionId: 'test-jump-v2', version: 2 }
     const sessions = [
       session('s1', '2026-08-12'),
       session('s2', '2026-10-10', 2),
     ]
-    const data = await createTestPlayerHistoryService(
-      repository(
-        sessions,
-        [result(sessions[0], 32), result(sessions[1], 40)],
-        [definition, v2],
-      ),
-    ).getPlayerHistory(context, 'alice')
+    const data = buildPlayerHistory({
+      player,
+      sessions,
+      results: [result(sessions[0], 32), result(sessions[1], 40)],
+      definitions: [definition, v2],
+      benchmarks: [benchmark],
+    })
     expect(data.histories.map(({ definition: item }) => item.version)).toEqual([
       2, 1,
     ])
   })
 
-  it('refuse playerId hors scope et permission absente', async () => {
+  it('refuse une permission absente avant les lectures repository', async () => {
+    const repo = repository()
     await expect(
-      createTestPlayerHistoryService(repository()).getPlayerHistory(
-        context,
-        'intruder',
-      ),
+      createTestPlayerHistoryService(repo).listScopedPlayers({
+        ...context,
+        accesses: [],
+      }),
     ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' })
-    await expect(
-      createTestPlayerHistoryService(repository()).getPlayerHistory(
-        { ...context, accesses: [] },
-        'alice',
-      ),
-    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' })
+    expect(repo.assignmentsForTeam).not.toHaveBeenCalled()
   })
 
   it('propage une erreur repository', async () => {
     const repo = repository()
-    repo.listResultsByPlayer.mockRejectedValue(
+    repo.listCompletedSessions.mockRejectedValue(
       new Error('firestore unavailable'),
     )
     await expect(
-      createTestPlayerHistoryService(repo).getPlayerHistory(context, 'alice'),
+      createTestPlayerHistoryService(repo).listCompletedSessions(context),
     ).rejects.toThrow('firestore unavailable')
   })
 })
