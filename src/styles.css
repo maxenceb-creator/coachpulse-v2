@@ -5,13 +5,15 @@
 }
 
 .history-filters,
+.history-detail-filters,
 .metric-summary {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
-.history-filters label {
+.history-filters label,
+.history-detail-filters label {
   display: grid;
   gap: 0.4rem;
 }

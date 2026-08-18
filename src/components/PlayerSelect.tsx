@@ -4,16 +4,24 @@ export function PlayerSelect({
   players,
   value,
   onChange,
+  loading = false,
 }: {
   players: Player[]
   value: string
   onChange: (playerId: string) => void
+  loading?: boolean
 }) {
   return (
     <label>
       Joueuse
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Sélectionner une joueuse</option>
+      <select
+        disabled={loading}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">
+          {loading ? 'Chargement des joueuses…' : 'Sélectionner une joueuse'}
+        </option>
         {[...players]
           .sort(
             (a, b) =>
