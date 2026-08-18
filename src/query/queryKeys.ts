@@ -104,6 +104,23 @@ export const queryKeys = {
       seasonId: string,
       testSessionId: string,
     ) => ['testSession', uid, roleId, teamId, seasonId, testSessionId] as const,
+    eligiblePlayers: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      testSessionId: string,
+    ) =>
+      [
+        ...queryKeys.tests.session(
+          uid,
+          roleId,
+          teamId,
+          seasonId,
+          testSessionId,
+        ),
+        'eligiblePlayers',
+      ] as const,
     results: (
       uid: string,
       roleId: string,

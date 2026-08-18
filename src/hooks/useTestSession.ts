@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRef } from 'react'
 import { queryKeys } from '../query/queryKeys'
 import {
   completeTestPlayerHistorySession,
@@ -32,6 +33,10 @@ const security = (context: TestHookContext) => ({
   accesses: context.accesses,
 })
 
+const SESSION_STALE_TIME = 30 * 1000
+const DEFINITION_STALE_TIME = Number.POSITIVE_INFINITY
+const ELIGIBLE_PLAYERS_STALE_TIME = 60 * 1000
+
 const reconcileQueries = (invalidations: Promise<unknown>[]) => {
   void Promise.all(invalidations).catch((error: unknown) => {
     if (!import.meta.env.DEV) return
@@ -44,6 +49,8 @@ const reconcileQueries = (invalidations: Promise<unknown>[]) => {
 }
 
 export const useTestSession = (context: TestHookContext, id: string) => {
+  const client = useQueryClient()
+  const loggedSessionHit = useRef('')
   const enabled =
     context.securityContextReady &&
     !!id &&
@@ -53,17 +60,39 @@ export const useTestSession = (context: TestHookContext, id: string) => {
       teamId: context.teamId,
       permissionKey: 'tests.read',
     })
+  const sessionKey = queryKeys.tests.session(
+    context.uid,
+    context.roleId,
+    context.teamId,
+    context.seasonId,
+    id,
+  )
   const session = useQuery({
-    queryKey: queryKeys.tests.session(
-      context.uid,
-      context.roleId,
-      context.teamId,
-      context.seasonId,
-      id,
-    ),
-    queryFn: () => testsService.getSession(security(context), id),
+    queryKey: sessionKey,
+    queryFn: () => {
+      if (import.meta.env.DEV)
+        console.debug('[TestSession DEV] Session query miss', {
+          testSessionId: id,
+          teamId: context.teamId,
+          seasonId: context.seasonId,
+        })
+      return testsService.getSession(security(context), id)
+    },
     enabled,
+    staleTime: SESSION_STALE_TIME,
   })
+  if (
+    import.meta.env.DEV &&
+    client.getQueryData(sessionKey) &&
+    loggedSessionHit.current !== id
+  ) {
+    loggedSessionHit.current = id
+    console.debug('[TestSession DEV] Session query hit', {
+      testSessionId: id,
+      teamId: context.teamId,
+      seasonId: context.seasonId,
+    })
+  }
   const definition = useQuery({
     queryKey: queryKeys.tests.definition(
       context.uid,
@@ -76,21 +105,20 @@ export const useTestSession = (context: TestHookContext, id: string) => {
     queryFn: () =>
       testsService.getDefinitionForSession(security(context), session.data!),
     enabled: enabled && !!session.data,
+    staleTime: DEFINITION_STALE_TIME,
   })
   const players = useQuery({
-    queryKey: [
-      ...queryKeys.tests.session(
-        context.uid,
-        context.roleId,
-        context.teamId,
-        context.seasonId,
-        id,
-      ),
-      'eligiblePlayers',
-    ],
+    queryKey: queryKeys.tests.eligiblePlayers(
+      context.uid,
+      context.roleId,
+      context.teamId,
+      context.seasonId,
+      id,
+    ),
     queryFn: () =>
       testsService.getEligiblePlayers(security(context), session.data!),
     enabled: enabled && !!session.data,
+    staleTime: ELIGIBLE_PLAYERS_STALE_TIME,
   })
   const results = useQuery({
     queryKey: queryKeys.tests.results(
@@ -102,6 +130,7 @@ export const useTestSession = (context: TestHookContext, id: string) => {
     ),
     queryFn: () => testsService.getResults(security(context), session.data!),
     enabled: enabled && !!session.data,
+    staleTime: SESSION_STALE_TIME,
   })
   return { session, definition, players, results }
 }
@@ -269,18 +298,38 @@ export const useCreateTestSession = (context: TestHookContext) => {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: {
-      testDefinitionId: string
-      testDefinitionVersion: number
+      definition: TestDefinition
       categoryId: string
       date: Date
-    }) =>
-      testsService.createSession(security(context), {
-        ...input,
-        testSessionId: crypto.randomUUID(),
-        teamId: context.teamId,
-        seasonId: context.seasonId,
-      }),
-    onSuccess: (session) => {
+    }) => {
+      if (import.meta.env.DEV)
+        console.debug('[TestSession DEV] Create start', {
+          testDefinitionId: input.definition.testDefinitionId,
+          version: input.definition.version,
+          teamId: context.teamId,
+          seasonId: context.seasonId,
+        })
+      return testsService
+        .createSession(security(context), {
+          testSessionId: crypto.randomUUID(),
+          testDefinitionId: input.definition.testDefinitionId,
+          testDefinitionVersion: input.definition.version,
+          categoryId: input.categoryId,
+          date: input.date,
+          teamId: context.teamId,
+          seasonId: context.seasonId,
+        })
+        .then((session) => {
+          if (import.meta.env.DEV)
+            console.debug('[TestSession DEV] Firestore success', {
+              testSessionId: session.testSessionId,
+              testDefinitionId: session.testDefinitionId,
+              version: session.testDefinitionVersion,
+            })
+          return session
+        })
+    },
+    onSuccess: (session, input) => {
       client.setQueryData<TestSession[]>(
         queryKeys.tests.sessions(
           context.uid,
@@ -295,6 +344,10 @@ export const useCreateTestSession = (context: TestHookContext) => {
           ),
         ],
       )
+      if (import.meta.env.DEV)
+        console.debug('[TestSession DEV] Cache session list update', {
+          testSessionId: session.testSessionId,
+        })
       client.setQueryData(
         queryKeys.tests.session(
           context.uid,
@@ -305,6 +358,43 @@ export const useCreateTestSession = (context: TestHookContext) => {
         ),
         session,
       )
+      if (import.meta.env.DEV)
+        console.debug('[TestSession DEV] Cache session detail update', {
+          testSessionId: session.testSessionId,
+        })
+      client.setQueryData(
+        queryKeys.tests.definition(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+          input.definition.testDefinitionId,
+          input.definition.version,
+        ),
+        input.definition,
+      )
+      client.setQueryData<TestResult[]>(
+        queryKeys.tests.results(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+          session.testSessionId,
+        ),
+        [],
+      )
+      void client.prefetchQuery({
+        queryKey: queryKeys.tests.eligiblePlayers(
+          context.uid,
+          context.roleId,
+          context.teamId,
+          context.seasonId,
+          session.testSessionId,
+        ),
+        queryFn: () =>
+          testsService.getEligiblePlayers(security(context), session),
+        staleTime: ELIGIBLE_PLAYERS_STALE_TIME,
+      })
       reconcileQueries([
         client.invalidateQueries({
           queryKey: queryKeys.tests.sessions(

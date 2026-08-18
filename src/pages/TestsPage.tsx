@@ -205,16 +205,22 @@ export function TestsPage() {
                           return
                         createSession.mutate(
                           {
-                            testDefinitionId: definition.testDefinitionId,
-                            testDefinitionVersion: definition.version,
+                            definition,
                             categoryId: activeTeam.categoryId,
                             date: new Date(`${sessionDate}T12:00:00`),
                           },
                           {
-                            onSuccess: (session) =>
+                            onSuccess: (session) => {
+                              if (import.meta.env.DEV)
+                                console.debug('[TestSession DEV] Navigation', {
+                                  testSessionId: session.testSessionId,
+                                  testDefinitionId: session.testDefinitionId,
+                                  version: session.testDefinitionVersion,
+                                })
                               navigate(
                                 `/tests/sessions/${session.testSessionId}`,
-                              ),
+                              )
+                            },
                           },
                         )
                       }}
