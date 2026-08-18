@@ -1,7 +1,62 @@
 import { repositories } from '../repositories/appRepositories'
 import { isAssignmentEffective } from './assignmentsService'
+import { hasPermission } from './permissionsService'
+import type { TeamAccess } from '../types/domain'
+
+export type PlayerProfileContext = {
+  userId: string
+  activeRoleId: string
+  teamId: string
+  seasonId: string
+  accesses: TeamAccess[]
+  categoryId?: string
+}
+
+export class PlayerProfileError extends Error {
+  constructor(
+    public readonly code:
+      'PERMISSION_DENIED' | 'PLAYER_NOT_FOUND' | 'PLAYER_OUT_OF_SCOPE',
+  ) {
+    super(code)
+  }
+}
 
 export const playersService = {
+  async getProfile(context: PlayerProfileContext, playerId: string) {
+    if (
+      !hasPermission(context.accesses, {
+        userId: context.userId,
+        activeRoleId: context.activeRoleId,
+        teamId: context.teamId,
+        permissionKey: 'players.read',
+      })
+    )
+      throw new PlayerProfileError('PERMISSION_DENIED')
+
+    const assignments = await repositories.assignmentsForTeam(
+      context.teamId,
+      context.seasonId,
+    )
+    const assignment = assignments.find(
+      (item) =>
+        item.playerId === playerId && isAssignmentEffective(item, new Date()),
+    )
+    if (!assignment) throw new PlayerProfileError('PLAYER_OUT_OF_SCOPE')
+
+    const player = (await repositories.activePlayers([playerId]))[0]
+    if (!player) throw new PlayerProfileError('PLAYER_NOT_FOUND')
+    const category = context.categoryId
+      ? await repositories.category(context.categoryId)
+      : null
+    const subCategories = category
+      ? await repositories.subCategories(category.subCategoryIds)
+      : []
+    const subCategory = subCategories.find(
+      ({ birthYearRule }) =>
+        birthYearRule === player.birthDate.getUTCFullYear(),
+    )
+    return { player, assignment, category, subCategory }
+  },
   async countEffectiveByTeam(
     teamId: string,
     seasonId: string,

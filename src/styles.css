@@ -31,6 +31,93 @@
 .history-list {
   line-height: 1.8;
 }
+.player-profile {
+  display: grid;
+  gap: 1.5rem;
+}
+.player-profile-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  align-items: center;
+}
+.player-profile-photo {
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e5efeb;
+}
+.player-profile-photo.placeholder {
+  display: grid;
+  place-items: center;
+  color: #154c40;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+.player-overview,
+.player-tests-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0 0;
+}
+.player-overview div,
+.player-tests-summary div {
+  background: #f2f6f4;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+.player-overview dt,
+.player-tests-summary dt {
+  color: #61736d;
+  font-size: 0.8rem;
+}
+.player-overview dd,
+.player-tests-summary dd {
+  margin: 0.35rem 0 0;
+  font-weight: 800;
+}
+.player-domain-section {
+  padding: 1.5rem;
+}
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.section-heading h2 {
+  margin: 0.25rem 0 0;
+}
+.player-tests-domain {
+  margin-top: 1.5rem;
+}
+.player-test-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.player-test-metric {
+  border: 1px solid #dce7e2;
+  border-radius: 0.8rem;
+  padding: 1rem;
+}
+.player-test-metric p {
+  color: #61736d;
+  margin: 0.25rem 0;
+}
+.metric-summary.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  font-size: 0.9rem;
+}
+.benchmark-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
 * {
   box-sizing: border-box;
 }
@@ -386,6 +473,18 @@ input {
   .analysis-stats,
   .metric-editor {
     grid-template-columns: 1fr;
+  }
+  .player-profile-header,
+  .player-test-metrics {
+    grid-template-columns: 1fr;
+  }
+  .player-overview,
+  .player-tests-summary,
+  .metric-summary.compact {
+    grid-template-columns: 1fr;
+  }
+  .section-heading {
+    flex-direction: column;
   }
 }
 @media (max-width: 430px) {

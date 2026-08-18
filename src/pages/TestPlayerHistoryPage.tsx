@@ -140,6 +140,12 @@ export function TestPlayerHistoryPage() {
                   : ''}{' '}
                 · {app.season?.name}
               </p>
+              <Link
+                className="button-link secondary"
+                to={`/players/${playerId}`}
+              >
+                Ouvrir la fiche joueuse
+              </Link>
             </section>
             {!filtered.length ? (
               <p className="card empty-state">

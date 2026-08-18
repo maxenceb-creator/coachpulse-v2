@@ -74,11 +74,28 @@ service cloud.firestore {
         && seasonId == context.activeSeasonId;
     }
 
+    function isActivePlayerCategory(categoryId, seasonId) {
+      let context = user().data.securityContext;
+      let team = get(/databases/$(database)/documents/teams/$(context.activeTeamId));
+      return canInActiveSecurityContext('players.read')
+        && team.data.categoryId == categoryId
+        && seasonId == context.activeSeasonId;
+    }
+
     function isActiveTestsSubCategory(subCategoryId, seasonId) {
       let context = user().data.securityContext;
       let team = get(/databases/$(database)/documents/teams/$(context.activeTeamId));
       let category = get(/databases/$(database)/documents/categories/$(team.data.categoryId));
       return canInActiveSecurityContext('tests.read')
+        && subCategoryId in category.data.subCategoryIds
+        && seasonId == context.activeSeasonId;
+    }
+
+    function isActivePlayerSubCategory(subCategoryId, seasonId) {
+      let context = user().data.securityContext;
+      let team = get(/databases/$(database)/documents/teams/$(context.activeTeamId));
+      let category = get(/databases/$(database)/documents/categories/$(team.data.categoryId));
+      return canInActiveSecurityContext('players.read')
         && subCategoryId in category.data.subCategoryIds
         && seasonId == context.activeSeasonId;
     }
@@ -327,14 +344,15 @@ service cloud.firestore {
     }
 
     match /categories/{categoryId} {
-      allow read: if isActiveTestsCategory(categoryId, resource.data.seasonId);
+      allow read: if isActiveTestsCategory(categoryId, resource.data.seasonId)
+        || isActivePlayerCategory(categoryId, resource.data.seasonId);
     }
 
     match /subCategories/{subCategoryId} {
       allow read: if isActiveTestsSubCategory(
         subCategoryId,
         resource.data.seasonId
-      );
+      ) || isActivePlayerSubCategory(subCategoryId, resource.data.seasonId);
     }
 
     match /playerTeamAssignments/{assignmentId} {

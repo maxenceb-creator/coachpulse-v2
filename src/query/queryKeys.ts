@@ -15,6 +15,14 @@ export const queryKeys = {
   players: {
     count: (uid: string, roleId: string, teamId: string, seasonId: string) =>
       ['players', 'count', uid, roleId, teamId, seasonId] as const,
+    profile: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      playerId: string,
+    ) =>
+      ['players', 'profile', uid, roleId, teamId, seasonId, playerId] as const,
   },
   tests: {
     catalogue: (

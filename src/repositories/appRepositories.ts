@@ -3,9 +3,11 @@ import { many, one, documentId, update } from './firestoreRepository'
 import {
   accessSchema,
   assignmentSchema,
+  categorySchema,
   playerSchema,
   roleSchema,
   seasonSchema,
+  subCategorySchema,
   teamSchema,
   userSchema,
 } from '../validation/schemas'
@@ -47,6 +49,14 @@ export const repositories = {
       where('seasonId', '==', seasonId),
       where('status', '==', 'ACTIVE'),
     ]),
+  category: (categoryId: string) =>
+    one('categories', categoryId, categorySchema),
+  subCategories: (ids: string[]) =>
+    ids.length
+      ? many('subCategories', subCategorySchema, [
+          where(documentId(), 'in', ids.slice(0, 30)),
+        ])
+      : Promise.resolve([]),
   async activePlayerCount(playerIds: string[]) {
     if (!playerIds.length) return 0
     const groups = Array.from(
