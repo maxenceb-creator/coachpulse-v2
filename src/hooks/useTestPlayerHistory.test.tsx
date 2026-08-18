@@ -1,9 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TeamAccess, TestResult, TestSession } from '../types/domain'
 import type { TestHookContext } from './useTestSession'
+import {
+  invalidateTestPlayerHistory,
+  updateTestPlayerHistoryResults,
+} from '../query/testPlayerHistoryCache'
 
 const mocks = vi.hoisted(() => ({
   listScopedPlayers: vi.fn(),
@@ -140,6 +144,9 @@ describe('useTestPlayerHistory cache performance', () => {
     )
     rerender({ playerId: 'emma' })
     expect(hook.current.data).toBeUndefined()
+    await waitFor(() =>
+      expect(mocks.listPlayerResults).toHaveBeenCalledTimes(2),
+    )
     resolveEmma([result('emma', 'u13')])
     await waitFor(() => expect(hook.current.data?.player.playerId).toBe('emma'))
 
@@ -149,6 +156,50 @@ describe('useTestPlayerHistory cache performance', () => {
     expect(mocks.getTaxonomy).toHaveBeenCalledTimes(1)
     expect(mocks.getDefinition).toHaveBeenCalledTimes(1)
     expect(mocks.getBenchmarks).toHaveBeenCalledTimes(1)
+
+    rerender({ playerId: 'alice' })
+    await waitFor(() =>
+      expect(hook.current.data?.player.playerId).toBe('alice'),
+    )
+    expect(mocks.listPlayerResults).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuse un playerId hors roster avant toute lecture de ses résultats', async () => {
+    const { result: hook } = renderHook(
+      () => useTestPlayerHistory(context('u13'), 'intruder'),
+      { wrapper },
+    )
+
+    await waitFor(() => expect(hook.current.isError).toBe(true))
+    expect(mocks.listCompletedSessions).toHaveBeenCalledTimes(1)
+    expect(mocks.listPlayerResults).not.toHaveBeenCalled()
+  })
+
+  it('recompose l’historique actif après mutation sans remount malgré le staleTime', async () => {
+    const { result: hook } = renderHook(
+      () => useTestPlayerHistory(context('u13'), 'alice'),
+      { wrapper },
+    )
+    await waitFor(() =>
+      expect(hook.current.data?.histories[0].metrics[0].latest?.value).toBe(38),
+    )
+    const updated = {
+      ...result('alice', 'u13'),
+      values: { HEIGHT: 42 },
+      updatedAt: new Date('2026-08-13T12:00:00Z'),
+    }
+    mocks.listPlayerResults.mockResolvedValue([updated])
+
+    await act(async () => {
+      updateTestPlayerHistoryResults(client, context('u13'), [updated])
+      await invalidateTestPlayerHistory(client, context('u13'), {
+        playerIds: ['alice'],
+      })
+    })
+
+    await waitFor(() =>
+      expect(hook.current.data?.histories[0].metrics[0].latest?.value).toBe(42),
+    )
   })
 
   it('recharge les données communes lorsque la Team change', async () => {

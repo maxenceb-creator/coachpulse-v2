@@ -169,7 +169,15 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
       1,
       'HEIGHT',
     )
+    const historyBenchmarksKey = queryKeys.tests.benchmarks(
+      context.userId,
+      context.activeRoleId,
+      context.teamId,
+      context.seasonId,
+      'subcat-u13-2026',
+    )
     client.setQueryData(analysisKey, { staleBenchmark: true })
+    client.setQueryData<TestBenchmark[]>(historyBenchmarksKey, [])
 
     await act(() =>
       result.current.mutations.createBenchmark.mutateAsync({
@@ -189,6 +197,10 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
       ]),
     )
     expect(result.current.mutations.createBenchmark.isPending).toBe(false)
+    expect(
+      client.getQueryData<TestBenchmark[]>(historyBenchmarksKey)?.[0]
+        .targetValue,
+    ).toBe(35)
     expect(client.getQueryState(analysisKey)?.isInvalidated).toBe(true)
 
     await act(() =>
@@ -201,6 +213,10 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
       expect(result.current.admin.benchmarks.data?.[0]?.targetValue).toBe(45),
     )
     expect(result.current.mutations.updateBenchmark.isPending).toBe(false)
+    expect(
+      client.getQueryData<TestBenchmark[]>(historyBenchmarksKey)?.[0]
+        .targetValue,
+    ).toBe(45)
 
     await act(() =>
       result.current.mutations.archiveBenchmark.mutateAsync(
@@ -213,6 +229,7 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
       ),
     )
     expect(result.current.mutations.archiveBenchmark.isPending).toBe(false)
+    expect(client.getQueryData(historyBenchmarksKey)).toEqual([])
 
     await act(() =>
       result.current.mutations.deleteBenchmark.mutateAsync(
@@ -223,5 +240,6 @@ describe('useTestDefinitionAdmin — benchmark DRAFT', () => {
       expect(result.current.admin.benchmarks.data).toEqual([]),
     )
     expect(result.current.mutations.deleteBenchmark.isPending).toBe(false)
+    expect(client.getQueryData(historyBenchmarksKey)).toEqual([])
   })
 })

@@ -52,6 +52,29 @@ export function TestSessionPage() {
     )
   }, [data.results.data])
 
+  useEffect(() => {
+    if (
+      !import.meta.env.DEV ||
+      !data.session.data ||
+      !data.definition.data ||
+      !data.players.data ||
+      !data.results.data
+    )
+      return
+    console.debug('[TestSession DEV] Page ready', {
+      testSessionId: data.session.data.testSessionId,
+      testDefinitionId: data.definition.data.testDefinitionId,
+      version: data.definition.data.version,
+      playerCount: data.players.data.length,
+      resultCount: data.results.data.length,
+    })
+  }, [
+    data.definition.data,
+    data.players.data,
+    data.results.data,
+    data.session.data,
+  ])
+
   if (!app.loading && app.securityContextReady && !canReadTests)
     return (
       <main className="center error">

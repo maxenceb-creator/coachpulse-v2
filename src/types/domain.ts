@@ -188,6 +188,7 @@ export type MetricPerformanceComparison = {
   delta?: number
   directionalDelta?: number
   relativeChange?: number
+  performanceRelativeChange?: number
   trend?: MetricTrend
 }
 

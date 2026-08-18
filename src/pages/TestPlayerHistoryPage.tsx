@@ -10,16 +10,12 @@ import {
 } from '../hooks/useTestPlayerHistory'
 import type { TestHookContext } from '../hooks/useTestSession'
 import type { TestMetricDefinition } from '../types/domain'
+import { formatSignedTestValue } from '../services/testHistoryFormatting'
 
 const format = (value: number | undefined, metric: TestMetricDefinition) =>
   value === undefined
     ? '—'
     : `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value)} ${metric.unit}`
-
-const signed = (value: number | undefined, suffix = '') =>
-  value === undefined
-    ? '—'
-    : `${value > 0 ? '+' : ''}${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value)}${suffix}`
 
 export function TestPlayerHistoryPage() {
   const { playerId = '' } = useParams()
@@ -189,7 +185,7 @@ export function TestPlayerHistoryPage() {
                         <div>
                           <dt>Évolution</dt>
                           <dd>
-                            {signed(
+                            {formatSignedTestValue(
                               summary.evolution?.delta,
                               ` ${summary.metric.unit}`,
                             )}
@@ -198,7 +194,10 @@ export function TestPlayerHistoryPage() {
                         <div>
                           <dt>Progression</dt>
                           <dd>
-                            {signed(summary.evolution?.relativeChange, ' %')}
+                            {formatSignedTestValue(
+                              summary.evolution?.performanceRelativeChange,
+                              ' %',
+                            )}
                           </dd>
                         </div>
                         <div>
@@ -210,23 +209,25 @@ export function TestPlayerHistoryPage() {
                           <dd>{summary.count}</dd>
                         </div>
                       </dl>
-                      {summary.benchmark ? (
-                        <p>
-                          Objectif {summary.benchmark.benchmarkLevel} :{' '}
-                          {format(
-                            summary.benchmark.targetValue,
-                            summary.metric,
-                          )}
-                          {summary.benchmarkComparison?.directionalDelta !==
-                          undefined
-                            ? ` · ${signed(summary.benchmarkComparison.directionalDelta, ` ${summary.metric.unit}`)}`
-                            : ''}
-                        </p>
+                      {summary.benchmarks.length ? (
+                        summary.benchmarks.map(({ benchmark, comparison }) => (
+                          <p key={benchmark.testBenchmarkId}>
+                            Objectif {benchmark.benchmarkLevel} :{' '}
+                            {format(benchmark.targetValue, summary.metric)}
+                            {comparison?.directionalDelta !== undefined
+                              ? ` · ${formatSignedTestValue(comparison.directionalDelta, ` ${summary.metric.unit}`)}`
+                              : ''}
+                          </p>
+                        ))
                       ) : (
                         <p>Aucun benchmark disponible.</p>
                       )}
                       <TestEvolutionChart
-                        benchmark={summary.benchmark?.targetValue}
+                        benchmark={
+                          summary.benchmarks.length === 1
+                            ? summary.benchmarks[0].benchmark.targetValue
+                            : undefined
+                        }
                         points={summary.points.map(({ session, value }) => ({
                           label: session.date.toLocaleDateString('fr-FR'),
                           value,

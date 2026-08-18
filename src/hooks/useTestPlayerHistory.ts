@@ -76,6 +76,7 @@ export const useTestPlayerHistory = (
           queryKey,
           queryFn: load,
           staleTime,
+          revalidateIfStale: true,
         })
         timings[`${name}Ms`] = performance.now() - start
         return data
@@ -100,7 +101,7 @@ export const useTestPlayerHistory = (
         context.seasonId,
         playerId,
       )
-      const [players, sessions, results] = await Promise.all([
+      const [players, sessions] = await Promise.all([
         timed(
           'roster',
           rosterKey,
@@ -113,19 +114,16 @@ export const useTestPlayerHistory = (
           () => testPlayerHistoryService.listCompletedSessions(serviceContext),
           SESSIONS_STALE_TIME,
         ),
-        timed(
-          'results',
-          resultsKey,
-          () =>
-            testPlayerHistoryService.listPlayerResults(
-              serviceContext,
-              playerId,
-            ),
-          RESULTS_STALE_TIME,
-        ),
       ])
       const player = players.find((item) => item.playerId === playerId)
       if (!player) throw new TestsDomainError('PERMISSION_DENIED')
+      const results = await timed(
+        'results',
+        resultsKey,
+        () =>
+          testPlayerHistoryService.listPlayerResults(serviceContext, playerId),
+        RESULTS_STALE_TIME,
+      )
       const relevantSessionIds = new Set(
         results.map(({ testSessionId }) => testSessionId),
       )
