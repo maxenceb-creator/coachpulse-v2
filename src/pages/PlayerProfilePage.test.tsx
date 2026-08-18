@@ -53,6 +53,13 @@ vi.mock('../hooks/usePlayerProfile', () => ({
 vi.mock('../hooks/useTestPlayerHistory', () => ({
   useTestPlayerHistory: mocks.history,
 }))
+vi.mock('../services/playersService', () => ({
+  PlayerProfileError: class PlayerProfileError extends Error {
+    constructor(public readonly code: string) {
+      super(code)
+    }
+  },
+}))
 
 const alice = {
   playerId: 'alice',
