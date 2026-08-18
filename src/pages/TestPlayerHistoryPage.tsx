@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../app/AppContext'
 import { useAuth } from '../auth/AuthProvider'
@@ -230,6 +230,25 @@ export function TestPlayerHistoryPage() {
   }
   const roster = useTestPlayerRoster(context)
   const activeTeam = app.teams.find(({ teamId }) => teamId === app.activeTeamId)
+  useEffect(() => {
+    if (!import.meta.env.DEV || !roster.data) return
+    console.debug('[PLAYER ROSTER UI DEV] page received roster', {
+      now: performance.now(),
+      teamId: context.teamId,
+      playersLength: roster.data.length,
+      isPending: roster.isPending,
+      isFetching: roster.isFetching,
+      status: roster.status,
+      fetchStatus: roster.fetchStatus,
+    })
+  }, [
+    context.teamId,
+    roster.data,
+    roster.fetchStatus,
+    roster.isFetching,
+    roster.isPending,
+    roster.status,
+  ])
 
   if (app.loading || !app.securityContextReady)
     return <main className="center">Chargement de l’historique…</main>
@@ -256,6 +275,10 @@ export function TestPlayerHistoryPage() {
           <PlayerSelect
             loading={roster.isPending}
             players={roster.data ?? []}
+            teamId={context.teamId}
+            isFetching={roster.isFetching}
+            status={roster.status}
+            fetchStatus={roster.fetchStatus}
             value={playerId}
             onChange={(id) =>
               navigate(id ? `/tests/players/${id}` : '/tests/players')

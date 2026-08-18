@@ -1771,3 +1771,9 @@ Team sans résultat conserve sa taxonomie propre et produit immédiatement un é
 vide, sans emprunter le cache d'une autre Team.
 Les futures sections Présences, Matchs, charge, blessures et médical suivront ce
 modèle sans transformer la fiche en nouvelle source de vérité.
+
+Lors d'un changement rapide de Team, une réponse de persistance du contexte
+devenue obsolète ne doit ni remplacer le contexte sélectionné ni purger ses
+queries protégées. Seule la réponse correspondant exactement au rôle, à la Team
+et à la saison actuellement sélectionnés peut appliquer la mise à jour de cache
+et le nettoyage associé.

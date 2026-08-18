@@ -26,3 +26,5 @@ export const isSecurityContextReady = (
   persisted.activeRoleId === selected.activeRoleId &&
   persisted.activeTeamId === selected.activeTeamId &&
   persisted.activeSeasonId === selected.activeSeasonId
+
+export const shouldApplySecurityContextResolution = isSecurityContextReady

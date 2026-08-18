@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -13,6 +14,7 @@ import { resolveAccessibleTeamAccesses } from '../services/permissionsService'
 import {
   isSecurityContextReady,
   selectActiveId,
+  shouldApplySecurityContextResolution,
 } from '../services/contextSelection'
 import { securityContextService } from '../services/securityContextService'
 import {
@@ -130,6 +132,16 @@ export function AppContext({ children }: { children: ReactNode }) {
     queryFn: repositories.activeSeason,
     select: (s) => s[0],
   })
+  const selectedContextRef = useRef({
+    activeRoleId,
+    activeTeamId,
+    activeSeasonId: sq.data?.seasonId,
+  })
+  selectedContextRef.current = {
+    activeRoleId,
+    activeTeamId,
+    activeSeasonId: sq.data?.seasonId,
+  }
   const contextMutation = useMutation({
     mutationFn: (context: {
       activeRoleId: string
@@ -143,6 +155,15 @@ export function AppContext({ children }: { children: ReactNode }) {
         ...context,
       }),
     onSuccess: (_, context) => {
+      const selected = selectedContextRef.current
+      if (!shouldApplySecurityContextResolution(context, selected)) {
+        if (import.meta.env.DEV)
+          console.debug('[Security context DEV] Réponse obsolète ignorée', {
+            resolved: context,
+            selected,
+          })
+        return
+      }
       if (import.meta.env.DEV) {
         console.debug('[Security context DEV] Contexte vérifié', context)
       }

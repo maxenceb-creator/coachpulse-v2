@@ -96,6 +96,25 @@ export const useTestPlayerRoster = (context: TestHookContext) => {
     staleTime: COMMON_STALE_TIME,
   })
   useEffect(() => {
+    if (!import.meta.env.DEV || !query.data) return
+    console.debug('[PLAYER ROSTER UI DEV] query resolved', {
+      now: performance.now(),
+      teamId: context.teamId,
+      playersLength: query.data.length,
+      isPending: query.isPending,
+      isFetching: query.isFetching,
+      status: query.status,
+      fetchStatus: query.fetchStatus,
+    })
+  }, [
+    context.teamId,
+    query.data,
+    query.fetchStatus,
+    query.isFetching,
+    query.isPending,
+    query.status,
+  ])
+  useEffect(() => {
     const serialized = JSON.stringify(key)
     if (
       !import.meta.env.DEV ||

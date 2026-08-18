@@ -85,6 +85,12 @@ const alice = {
   createdAt: new Date(),
   updatedAt: new Date(),
 }
+const lina = {
+  ...alice,
+  playerId: 'lina',
+  firstName: 'Lina',
+  lastName: 'Robert',
+}
 
 const historySuccess = {
   isPending: false,
@@ -103,7 +109,10 @@ function useSlowRoster() {
   }, [])
   return {
     isPending: !players,
+    isFetching: !players,
     isError: false,
+    status: players ? 'success' : 'pending',
+    fetchStatus: players ? 'idle' : 'fetching',
     data: players,
   }
 }
@@ -128,7 +137,10 @@ describe('navigation SPA vers l’historique joueuse', () => {
     vi.clearAllMocks()
     mocks.roster.mockReturnValue({
       isPending: true,
+      isFetching: true,
       isError: false,
+      status: 'pending',
+      fetchStatus: 'fetching',
       data: undefined,
     })
     mocks.history.mockReturnValue(historySuccess)
@@ -167,7 +179,10 @@ describe('navigation SPA vers l’historique joueuse', () => {
   it('stabilise le sélecteur quand le roster échoue', () => {
     mocks.roster.mockReturnValue({
       isPending: false,
+      isFetching: false,
       isError: true,
+      status: 'error',
+      fetchStatus: 'idle',
       data: undefined,
     })
     render(<TestRoutes initial="/tests/players" />)
@@ -181,7 +196,10 @@ describe('navigation SPA vers l’historique joueuse', () => {
   it('supporte accès direct, retour Tests, cache chaud et nouvelle navigation', () => {
     mocks.roster.mockReturnValue({
       isPending: false,
+      isFetching: false,
       isError: false,
+      status: 'success',
+      fetchStatus: 'idle',
       data: [alice],
     })
     render(<TestRoutes initial="/tests/players" />)
@@ -198,21 +216,27 @@ describe('navigation SPA vers l’historique joueuse', () => {
     expect(mocks.history).not.toHaveBeenCalled()
   })
 
-  it('recompose le roster avec la Team active après changement de contexte', () => {
-    mocks.roster.mockReturnValue({
+  it('affiche immédiatement U14 puis U13 avec data disponible pendant un background refetch', () => {
+    mocks.roster.mockImplementation(({ teamId }) => ({
       isPending: false,
+      isFetching: teamId === 'team-b',
       isError: false,
-      data: [alice],
-    })
+      status: 'success',
+      fetchStatus: teamId === 'team-b' ? 'fetching' : 'idle',
+      data: teamId === 'team-b' ? [lina] : [alice],
+    }))
     const view = render(<TestRoutes initial="/tests/players" />)
-    expect(mocks.roster).toHaveBeenLastCalledWith(
-      expect.objectContaining({ teamId: 'team-a' }),
-    )
+    expect(screen.getByRole('option', { name: 'Alice Martin' })).toBeVisible()
     mocks.app.activeTeamId = 'team-b'
     view.rerender(<TestRoutes initial="/tests/players" />)
-    expect(mocks.roster).toHaveBeenLastCalledWith(
-      expect.objectContaining({ teamId: 'team-b' }),
-    )
+    expect(screen.getByRole('option', { name: 'Lina Robert' })).toBeVisible()
+    expect(screen.getByLabelText('Joueuse')).toBeEnabled()
+    expect(
+      screen.queryByText('Chargement des joueuses…'),
+    ).not.toBeInTheDocument()
     mocks.app.activeTeamId = 'team-a'
+    view.rerender(<TestRoutes initial="/tests/players" />)
+    expect(screen.getByRole('option', { name: 'Alice Martin' })).toBeVisible()
+    expect(screen.getByLabelText('Joueuse')).toBeEnabled()
   })
 })
