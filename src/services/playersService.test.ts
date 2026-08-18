@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { repositories } from '../repositories/appRepositories'
-import type { Assignment } from '../types/domain'
-import { playersService } from './playersService'
+import type { Assignment, Player, TeamAccess } from '../types/domain'
+import { PlayerProfileError, playersService } from './playersService'
 
 vi.mock('../repositories/appRepositories', () => ({
   repositories: {
     assignmentsForTeam: vi.fn(),
     activePlayerCount: vi.fn(),
+    activePlayers: vi.fn(),
+    category: vi.fn(),
+    subCategories: vi.fn(),
   },
 }))
 
@@ -26,6 +29,37 @@ const assignment = (
   endDate: endDate ? new Date(endDate) : undefined,
   status: 'ACTIVE',
 })
+
+const player: Player = {
+  playerId: 'player-a',
+  firstName: 'Alice',
+  lastName: 'Martin',
+  birthDate: new Date('2013-03-01T00:00:00.000Z'),
+  playerProfile: 'MIDFIELDER',
+  preferredFoot: 'RIGHT',
+  status: 'ACTIVE',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
+const accesses: TeamAccess[] = [
+  {
+    userTeamAccessId: 'access-a',
+    userId: 'user-a',
+    teamId: 'team-dev-u13f',
+    status: 'ACTIVE',
+    rolePermissions: {
+      coach: { permissions: ['players.read'], medicalAccessLevel: 'NONE' },
+    },
+  },
+]
+const profileContext = {
+  userId: 'user-a',
+  activeRoleId: 'coach',
+  teamId: 'team-dev-u13f',
+  seasonId: 'season-2026-2027',
+  categoryId: 'category-u13',
+  accesses,
+}
 
 describe('comptage effectif des joueuses par Team', () => {
   afterEach(() => vi.clearAllMocks())
@@ -64,5 +98,59 @@ describe('comptage effectif des joueuses par Team', () => {
       ),
     ).resolves.toBe(2)
     expect(count).toHaveBeenCalledWith(['temporary-active', 'without-end-date'])
+  })
+})
+
+describe('fiche joueuse scopée', () => {
+  afterEach(() => vi.clearAllMocks())
+
+  it('retourne séparément roster, identité et taxonomie autorisés', async () => {
+    vi.mocked(repositories.assignmentsForTeam).mockResolvedValue([
+      assignment('player-a', 'PRIMARY', '2020-01-01T00:00:00.000Z'),
+    ])
+    vi.mocked(repositories.activePlayers).mockResolvedValue([player])
+    vi.mocked(repositories.category).mockResolvedValue({
+      categoryId: 'category-u13',
+      seasonId: profileContext.seasonId,
+      name: 'U12-U13',
+      subCategoryIds: ['subcat-u13'],
+      status: 'ACTIVE',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    vi.mocked(repositories.subCategories).mockResolvedValue([
+      {
+        subCategoryId: 'subcat-u13',
+        seasonId: profileContext.seasonId,
+        name: 'U13',
+        birthYearRule: 2013,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ])
+
+    const roster = await playersService.listScopedPlayers(profileContext)
+    expect(
+      playersService.getProfileIdentity(profileContext, 'player-a', roster),
+    ).toMatchObject({ player: { playerId: 'player-a' } })
+    await expect(
+      playersService.getProfileTaxonomy(profileContext, 2013),
+    ).resolves.toMatchObject({ subCategory: { name: 'U13' } })
+  })
+
+  it('refuse une joueuse absente du roster déjà validé', () => {
+    expect(() =>
+      playersService.getProfileIdentity(profileContext, 'player-b', [player]),
+    ).toThrow(new PlayerProfileError('PLAYER_OUT_OF_SCOPE'))
+  })
+
+  it('refuse la fiche sans players.read', () => {
+    expect(() =>
+      playersService.getProfileIdentity(
+        { ...profileContext, accesses: [], teamId: 'team-b' },
+        'player-a',
+        [player],
+      ),
+    ).toThrow(new PlayerProfileError('PERMISSION_DENIED'))
   })
 })

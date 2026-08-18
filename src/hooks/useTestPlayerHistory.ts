@@ -5,6 +5,7 @@ import { buildPlayerHistory } from '../services/testPlayerHistoryService'
 import { TestsDomainError } from '../services/testsService'
 import { hasPermission } from '../services/permissionsService'
 import type { TestHookContext } from './useTestSession'
+import type { Category, Player, SubCategory } from '../types/domain'
 
 const COMMON_STALE_TIME = 5 * 60 * 1000
 const SESSIONS_STALE_TIME = 60 * 1000
@@ -31,23 +32,29 @@ const enabled = (context: TestHookContext) =>
     permissionKey: 'tests.read',
   })
 
-export const useTestPlayerRoster = (context: TestHookContext) =>
-  useQuery({
-    queryKey: queryKeys.tests.playerRoster(
-      context.uid,
-      context.roleId,
-      context.teamId,
-      context.seasonId,
-    ),
+export const useTestPlayerRoster = (context: TestHookContext) => {
+  const key = queryKeys.tests.playerRoster(
+    context.uid,
+    context.roleId,
+    context.teamId,
+    context.seasonId,
+  )
+  return useQuery({
+    queryKey: key,
     queryFn: () =>
       testPlayerHistoryService.listScopedPlayers(contextFor(context)),
     enabled: enabled(context),
     staleTime: COMMON_STALE_TIME,
   })
+}
 
 export const useTestPlayerHistory = (
   context: TestHookContext,
   playerId: string,
+  resolved?: {
+    player: Player
+    taxonomy?: { category: Category | null; subCategory?: SubCategory }
+  },
 ) => {
   const client = useQueryClient()
   return useQuery({
@@ -59,28 +66,18 @@ export const useTestPlayerHistory = (
       playerId,
     ),
     queryFn: async () => {
-      const startedAt = performance.now()
       const serviceContext = contextFor(context)
-      const timings: Record<string, number> = {}
-      const cache: Record<string, 'hit' | 'miss'> = {}
-      const timed = async <T>(
-        name: string,
+      const cached = <T>(
         queryKey: readonly unknown[],
         load: () => Promise<T>,
         staleTime: number,
-      ) => {
-        cache[name] =
-          client.getQueryData(queryKey) === undefined ? 'miss' : 'hit'
-        const start = performance.now()
-        const data = await client.ensureQueryData({
+      ) =>
+        client.ensureQueryData({
           queryKey,
           queryFn: load,
           staleTime,
           revalidateIfStale: true,
         })
-        timings[`${name}Ms`] = performance.now() - start
-        return data
-      }
 
       const rosterKey = queryKeys.tests.playerRoster(
         context.uid,
@@ -101,36 +98,55 @@ export const useTestPlayerHistory = (
         context.seasonId,
         playerId,
       )
-      const [players, sessions] = await Promise.all([
-        timed(
-          'roster',
-          rosterKey,
-          () => testPlayerHistoryService.listScopedPlayers(serviceContext),
-          COMMON_STALE_TIME,
-        ),
-        timed(
-          'sessions',
+      const rosterPromise = resolved
+        ? Promise.resolve([resolved.player])
+        : cached(
+            rosterKey,
+            () => testPlayerHistoryService.listScopedPlayers(serviceContext),
+            COMMON_STALE_TIME,
+          )
+      const resultsPromise = resolved
+        ? cached(
+            resultsKey,
+            () =>
+              testPlayerHistoryService.listPlayerResults(
+                serviceContext,
+                playerId,
+              ),
+            RESULTS_STALE_TIME,
+          )
+        : undefined
+      const [players, sessions, prefetchedResults] = await Promise.all([
+        rosterPromise,
+        cached(
           sessionsKey,
           () => testPlayerHistoryService.listCompletedSessions(serviceContext),
           SESSIONS_STALE_TIME,
         ),
+        resultsPromise,
       ])
       const player = players.find((item) => item.playerId === playerId)
       if (!player) throw new TestsDomainError('PERMISSION_DENIED')
-      const results = await timed(
-        'results',
-        resultsKey,
-        () =>
-          testPlayerHistoryService.listPlayerResults(serviceContext, playerId),
-        RESULTS_STALE_TIME,
-      )
+      const results =
+        prefetchedResults ??
+        (await cached(
+          resultsKey,
+          () =>
+            testPlayerHistoryService.listPlayerResults(
+              serviceContext,
+              playerId,
+            ),
+          RESULTS_STALE_TIME,
+        ))
       const relevantSessionIds = new Set(
         results.map(({ testSessionId }) => testSessionId),
       )
       const categoryId =
         sessions.find(({ testSessionId }) =>
           relevantSessionIds.has(testSessionId),
-        )?.categoryId ?? ''
+        )?.categoryId ??
+        resolved?.taxonomy?.category?.categoryId ??
+        ''
       const taxonomyKey = queryKeys.tests.playerHistoryTaxonomy(
         context.uid,
         context.roleId,
@@ -138,16 +154,25 @@ export const useTestPlayerHistory = (
         context.seasonId,
         categoryId,
       )
-      const taxonomy = await timed(
-        'taxonomy',
-        taxonomyKey,
-        () => testPlayerHistoryService.getTaxonomy(serviceContext, categoryId),
-        COMMON_STALE_TIME,
-      )
-      const subCategory = taxonomy.subCategories.find(
-        ({ birthYearRule }) =>
-          birthYearRule === player.birthDate.getUTCFullYear(),
-      )
+      const taxonomy = resolved?.taxonomy
+        ? {
+            category: resolved.taxonomy.category,
+            subCategories: resolved.taxonomy.subCategory
+              ? [resolved.taxonomy.subCategory]
+              : [],
+          }
+        : await cached(
+            taxonomyKey,
+            () =>
+              testPlayerHistoryService.getTaxonomy(serviceContext, categoryId),
+            COMMON_STALE_TIME,
+          )
+      const subCategory =
+        resolved?.taxonomy?.subCategory ??
+        taxonomy.subCategories.find(
+          ({ birthYearRule }) =>
+            birthYearRule === player.birthDate.getUTCFullYear(),
+        )
       const definitionRefs = [
         ...new Map(
           results.map((result) => [
@@ -159,11 +184,9 @@ export const useTestPlayerHistory = (
           ]),
         ).values(),
       ]
-      const definitionsStart = performance.now()
       const definitionsPromise = Promise.all(
         definitionRefs.map(({ id, version }) =>
-          timed(
-            `definition:${id}`,
+          cached(
             queryKeys.tests.definition(
               context.uid,
               context.roleId,
@@ -177,31 +200,29 @@ export const useTestPlayerHistory = (
           ),
         ),
       )
-      const benchmarksPromise = subCategory
-        ? timed(
-            'benchmarks',
-            queryKeys.tests.benchmarks(
-              context.uid,
-              context.roleId,
-              context.teamId,
-              context.seasonId,
-              subCategory.subCategoryId,
-            ),
-            () =>
-              testPlayerHistoryService.getBenchmarks(
-                serviceContext,
+      const benchmarksPromise =
+        subCategory && definitionRefs.length
+          ? cached(
+              queryKeys.tests.benchmarks(
+                context.uid,
+                context.roleId,
+                context.teamId,
+                context.seasonId,
                 subCategory.subCategoryId,
               ),
-            COMMON_STALE_TIME,
-          )
-        : Promise.resolve([])
+              () =>
+                testPlayerHistoryService.getBenchmarks(
+                  serviceContext,
+                  subCategory.subCategoryId,
+                ),
+              COMMON_STALE_TIME,
+            )
+          : Promise.resolve([])
       const [definitions, benchmarks] = await Promise.all([
         definitionsPromise,
         benchmarksPromise,
       ])
-      timings.definitionsMs = performance.now() - definitionsStart
-      const analyticsStart = performance.now()
-      const history = buildPlayerHistory({
+      return buildPlayerHistory({
         player,
         subCategory,
         results,
@@ -209,17 +230,6 @@ export const useTestPlayerHistory = (
         definitions,
         benchmarks,
       })
-      timings.analyticsMs = performance.now() - analyticsStart
-      if (import.meta.env.DEV)
-        console.debug('[TestPlayerHistory PERF DEV]', {
-          playerId,
-          teamId: context.teamId,
-          seasonId: context.seasonId,
-          totalMs: performance.now() - startedAt,
-          ...timings,
-          cache,
-        })
-      return history
     },
     enabled: enabled(context) && !!playerId,
     staleTime: RESULTS_STALE_TIME,

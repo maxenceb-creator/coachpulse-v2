@@ -195,15 +195,33 @@ describe('cycle de vie du cache privé', () => {
       '2026',
       'lina',
     )
+    const u13Profile = queryKeys.players.profile(
+      'user-a',
+      'coach',
+      'u13',
+      '2026',
+      'alice',
+    )
+    const u14Profile = queryKeys.players.profile(
+      'user-a',
+      'coach',
+      'u14',
+      '2026',
+      'lina',
+    )
     client.setQueryData(u13Roster, ['alice'])
     client.setQueryData(u13History, [32, 35, 38])
     client.setQueryData(u14History, [40])
+    client.setQueryData(u13Profile, { playerId: 'alice' })
+    client.setQueryData(u14Profile, { playerId: 'lina' })
 
     await removeTeamScopedQueries(client, 'user-a', 'coach', 'u13')
 
     expect(client.getQueryData(u13Roster)).toBeUndefined()
     expect(client.getQueryData(u13History)).toBeUndefined()
     expect(client.getQueryData(u14History)).toEqual([40])
+    expect(client.getQueryData(u13Profile)).toBeUndefined()
+    expect(client.getQueryData(u14Profile)).toEqual({ playerId: 'lina' })
   })
 
   it('retire tout contexte protégé différent du securityContext confirmé', async () => {

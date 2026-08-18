@@ -958,6 +958,10 @@ describe('Security Rules du socle et accès joueuses', () => {
         ),
       ),
     )
+    await assertSucceeds(getDoc(doc(db, 'categories/category-a')))
+    await assertSucceeds(getDoc(doc(db, 'subCategories/subcat-a')))
+    await assertFails(getDoc(doc(db, 'categories/category-b')))
+    await assertFails(getDoc(doc(db, 'subCategories/subcat-b')))
   })
 
   it("refuse une joueuse d'une autre Team", async () => {

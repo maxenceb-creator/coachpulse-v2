@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isSecurityContextReady, selectActiveId } from './contextSelection'
+import {
+  isSecurityContextReady,
+  selectActiveId,
+  shouldApplySecurityContextResolution,
+} from './contextSelection'
 
 describe('sélection du contexte actif', () => {
   it('conserve une sélection encore accessible', () =>
@@ -35,5 +39,15 @@ describe('synchronisation du securityContext', () => {
 
   it('autorise une query protégée uniquement avec le contexte confirmé exact', () => {
     expect(isSecurityContextReady(persisted, persisted)).toBe(true)
+  })
+
+  it('ignore une réponse U13 devenue obsolète après sélection U14', () => {
+    expect(
+      shouldApplySecurityContextResolution(persisted, {
+        activeRoleId: 'coach',
+        activeTeamId: 'u14',
+        activeSeasonId: '2026',
+      }),
+    ).toBe(false)
   })
 })
