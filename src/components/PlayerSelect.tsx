@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import type { Player } from '../types/domain'
 
 export function PlayerSelect({
@@ -6,37 +5,12 @@ export function PlayerSelect({
   value,
   onChange,
   loading = false,
-  teamId,
-  isFetching,
-  status,
-  fetchStatus,
 }: {
   players: Player[]
   value: string
   onChange: (playerId: string) => void
   loading?: boolean
-  teamId: string
-  isFetching: boolean
-  status: string
-  fetchStatus: string
 }) {
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    const state = {
-      now: performance.now(),
-      teamId,
-      playersLength: players.length,
-      isPending: loading,
-      isFetching,
-      status,
-      fetchStatus,
-    }
-    console.debug('[PLAYER ROSTER UI DEV] select received players', state)
-    console.debug('[PLAYER ROSTER UI DEV] select rendered', {
-      ...state,
-      optionCount: players.length,
-    })
-  }, [fetchStatus, isFetching, loading, players, status, teamId])
   return (
     <label>
       Joueuse

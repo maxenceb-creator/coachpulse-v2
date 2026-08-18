@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
 import { testPlayerHistoryService } from '../services/appTestsService'
@@ -34,104 +33,19 @@ const enabled = (context: TestHookContext) =>
   })
 
 export const useTestPlayerRoster = (context: TestHookContext) => {
-  const client = useQueryClient()
   const key = queryKeys.tests.playerRoster(
     context.uid,
     context.roleId,
     context.teamId,
     context.seasonId,
   )
-  const loggedKey = useRef('')
-  const finishedKey = useRef('')
-  const startedAt = useRef(performance.now())
-  useEffect(() => {
-    const serialized = JSON.stringify(key)
-    if (!import.meta.env.DEV || loggedKey.current === serialized) return
-    loggedKey.current = serialized
-    finishedKey.current = ''
-    startedAt.current = performance.now()
-    console.debug('[PlayerRoster PERF DEV]', {
-      step: 'start',
-      cache: client.getQueryData(key) === undefined ? 'miss' : 'hit',
-      teamId: context.teamId,
-      roleId: context.roleId,
-      seasonId: context.seasonId,
-      enabled: enabled(context),
-    })
-  }, [client, context, key])
-  const query = useQuery({
+  return useQuery({
     queryKey: key,
-    queryFn: async () => {
-      const startedAt = performance.now()
-      if (import.meta.env.DEV)
-        console.debug('[PlayerRoster PERF DEV]', {
-          step: 'Firestore start',
-          source: 'test-player-history',
-          teamId: context.teamId,
-        })
-      try {
-        const players = await testPlayerHistoryService.listScopedPlayers(
-          contextFor(context),
-        )
-        if (import.meta.env.DEV)
-          console.debug('[PlayerRoster PERF DEV]', {
-            step: 'Firestore success',
-            source: 'test-player-history',
-            count: players.length,
-            totalMs: performance.now() - startedAt,
-          })
-        return players
-      } catch (error) {
-        if (import.meta.env.DEV)
-          console.error('[PlayerRoster PERF DEV]', {
-            step: 'Firestore error',
-            source: 'test-player-history',
-            totalMs: performance.now() - startedAt,
-            error,
-          })
-        throw error
-      }
-    },
+    queryFn: () =>
+      testPlayerHistoryService.listScopedPlayers(contextFor(context)),
     enabled: enabled(context),
     staleTime: COMMON_STALE_TIME,
   })
-  useEffect(() => {
-    if (!import.meta.env.DEV || !query.data) return
-    console.debug('[PLAYER ROSTER UI DEV] query resolved', {
-      now: performance.now(),
-      teamId: context.teamId,
-      playersLength: query.data.length,
-      isPending: query.isPending,
-      isFetching: query.isFetching,
-      status: query.status,
-      fetchStatus: query.fetchStatus,
-    })
-  }, [
-    context.teamId,
-    query.data,
-    query.fetchStatus,
-    query.isFetching,
-    query.isPending,
-    query.status,
-  ])
-  useEffect(() => {
-    const serialized = JSON.stringify(key)
-    if (
-      !import.meta.env.DEV ||
-      finishedKey.current === serialized ||
-      (!query.isSuccess && !query.isError)
-    )
-      return
-    finishedKey.current = serialized
-    console.debug('[PlayerRoster PERF DEV]', {
-      step: 'end',
-      status: query.isSuccess ? 'success' : 'error',
-      count: query.data?.length,
-      totalMs: performance.now() - startedAt.current,
-      teamId: context.teamId,
-    })
-  }, [context.teamId, key, query.data, query.isError, query.isSuccess])
-  return query
 }
 
 export const useTestPlayerHistory = (
@@ -152,28 +66,18 @@ export const useTestPlayerHistory = (
       playerId,
     ),
     queryFn: async () => {
-      const startedAt = performance.now()
       const serviceContext = contextFor(context)
-      const timings: Record<string, number> = {}
-      const cache: Record<string, 'hit' | 'miss'> = {}
-      const timed = async <T>(
-        name: string,
+      const cached = <T>(
         queryKey: readonly unknown[],
         load: () => Promise<T>,
         staleTime: number,
-      ) => {
-        cache[name] =
-          client.getQueryData(queryKey) === undefined ? 'miss' : 'hit'
-        const start = performance.now()
-        const data = await client.ensureQueryData({
+      ) =>
+        client.ensureQueryData({
           queryKey,
           queryFn: load,
           staleTime,
           revalidateIfStale: true,
         })
-        timings[`${name}Ms`] = performance.now() - start
-        return data
-      }
 
       const rosterKey = queryKeys.tests.playerRoster(
         context.uid,
@@ -196,16 +100,13 @@ export const useTestPlayerHistory = (
       )
       const rosterPromise = resolved
         ? Promise.resolve([resolved.player])
-        : timed(
-            'roster',
+        : cached(
             rosterKey,
             () => testPlayerHistoryService.listScopedPlayers(serviceContext),
             COMMON_STALE_TIME,
           )
-      if (resolved) cache.roster = 'hit'
       const resultsPromise = resolved
-        ? timed(
-            'results',
+        ? cached(
             resultsKey,
             () =>
               testPlayerHistoryService.listPlayerResults(
@@ -217,8 +118,7 @@ export const useTestPlayerHistory = (
         : undefined
       const [players, sessions, prefetchedResults] = await Promise.all([
         rosterPromise,
-        timed(
-          'sessions',
+        cached(
           sessionsKey,
           () => testPlayerHistoryService.listCompletedSessions(serviceContext),
           SESSIONS_STALE_TIME,
@@ -229,8 +129,7 @@ export const useTestPlayerHistory = (
       if (!player) throw new TestsDomainError('PERMISSION_DENIED')
       const results =
         prefetchedResults ??
-        (await timed(
-          'results',
+        (await cached(
           resultsKey,
           () =>
             testPlayerHistoryService.listPlayerResults(
@@ -262,14 +161,12 @@ export const useTestPlayerHistory = (
               ? [resolved.taxonomy.subCategory]
               : [],
           }
-        : await timed(
-            'taxonomy',
+        : await cached(
             taxonomyKey,
             () =>
               testPlayerHistoryService.getTaxonomy(serviceContext, categoryId),
             COMMON_STALE_TIME,
           )
-      if (resolved?.taxonomy) cache.taxonomy = 'hit'
       const subCategory =
         resolved?.taxonomy?.subCategory ??
         taxonomy.subCategories.find(
@@ -287,11 +184,9 @@ export const useTestPlayerHistory = (
           ]),
         ).values(),
       ]
-      const definitionsStart = performance.now()
       const definitionsPromise = Promise.all(
         definitionRefs.map(({ id, version }) =>
-          timed(
-            `definition:${id}`,
+          cached(
             queryKeys.tests.definition(
               context.uid,
               context.roleId,
@@ -307,8 +202,7 @@ export const useTestPlayerHistory = (
       )
       const benchmarksPromise =
         subCategory && definitionRefs.length
-          ? timed(
-              'benchmarks',
+          ? cached(
               queryKeys.tests.benchmarks(
                 context.uid,
                 context.roleId,
@@ -328,9 +222,7 @@ export const useTestPlayerHistory = (
         definitionsPromise,
         benchmarksPromise,
       ])
-      timings.definitionsMs = performance.now() - definitionsStart
-      const analyticsStart = performance.now()
-      const history = buildPlayerHistory({
+      return buildPlayerHistory({
         player,
         subCategory,
         results,
@@ -338,17 +230,6 @@ export const useTestPlayerHistory = (
         definitions,
         benchmarks,
       })
-      timings.analyticsMs = performance.now() - analyticsStart
-      if (import.meta.env.DEV)
-        console.debug('[TestPlayerHistory PERF DEV]', {
-          playerId,
-          teamId: context.teamId,
-          seasonId: context.seasonId,
-          totalMs: performance.now() - startedAt,
-          ...timings,
-          cache,
-        })
-      return history
     },
     enabled: enabled(context) && !!playerId,
     staleTime: RESULTS_STALE_TIME,
