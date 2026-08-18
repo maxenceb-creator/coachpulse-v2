@@ -11,13 +11,13 @@ const mocks = vi.hoisted(() => ({
   history: vi.fn(),
   app: {
     activeRoleId: 'coach',
-    activeTeamId: 'team-a',
+    activeTeamId: 'team-u14',
     season: { seasonId: 'season-a', name: '2026-2027' },
     accesses: [
       {
         userTeamAccessId: 'access-a',
         userId: 'user-a',
-        teamId: 'team-a',
+        teamId: 'team-u14',
         status: 'ACTIVE',
         rolePermissions: {
           coach: {
@@ -29,9 +29,9 @@ const mocks = vi.hoisted(() => ({
     ],
     teams: [
       {
-        teamId: 'team-a',
-        name: 'U13F',
-        categoryId: 'category-a',
+        teamId: 'team-u14',
+        name: 'U14F',
+        categoryId: 'category-u14',
         teamType: 'DEVELOPMENT',
         status: 'ACTIVE',
       },
@@ -89,11 +89,13 @@ describe('cycle de chargement de la fiche joueuse', () => {
     mocks.profile.mockReturnValue({
       isPending: false,
       isError: false,
-      data: { player: alice },
+      status: 'success',
+      data: { player: alice, rosterCount: 1 },
     })
     mocks.taxonomy.mockReturnValue({
       isPending: false,
       isError: false,
+      status: 'success',
       data: { category: null, subCategory: undefined },
     })
     mocks.history.mockReturnValue({
@@ -104,7 +106,7 @@ describe('cycle de chargement de la fiche joueuse', () => {
     })
   })
 
-  it('affiche l’identité pendant qu’une Promise Tests reste pending', () => {
+  it('affiche l’identité U14F pendant qu’une Promise Tests reste pending', () => {
     const neverResolvingTests = new Promise(() => undefined)
     mocks.history.mockReturnValue({
       isPending: true,
@@ -119,10 +121,11 @@ describe('cycle de chargement de la fiche joueuse', () => {
     expect(screen.getByText('Chargement des tests…')).toBeInTheDocument()
   })
 
-  it('conserve l’identité si le bloc Tests échoue', () => {
+  it('conserve l’identité U14F si le bloc Tests échoue', () => {
     mocks.history.mockReturnValue({
       isPending: false,
       isError: true,
+      status: 'error',
       isSuccess: false,
     })
     renderPage()

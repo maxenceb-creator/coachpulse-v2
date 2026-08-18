@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApp } from '../app/AppContext'
 import { useAuth } from '../auth/AuthProvider'
@@ -44,6 +45,44 @@ export function PlayerProfilePage() {
     teamId: context.teamId,
     permissionKey: 'tests.read',
   })
+  const canReadPlayers = hasPermission(app.accesses, {
+    userId: context.userId,
+    activeRoleId: context.activeRoleId,
+    teamId: context.teamId,
+    permissionKey: 'players.read',
+  })
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.debug('[PLAYER CONTEXT DEV]', {
+      uid: context.userId,
+      activeRoleId: context.activeRoleId,
+      teamId: context.teamId,
+      seasonId: context.seasonId,
+      categoryId: context.categoryId,
+      subCategoryId: taxonomy.data?.subCategory?.subCategoryId,
+      rosterCount: profile.data?.rosterCount,
+      selectedPlayerId: playerId,
+      playersRead: canReadPlayers,
+      testsRead: canReadTests,
+      securityContextReady: context.securityContextReady,
+      profileStatus: profile.status,
+      taxonomyStatus: taxonomy.status,
+    })
+  }, [
+    canReadPlayers,
+    canReadTests,
+    context.activeRoleId,
+    context.categoryId,
+    context.securityContextReady,
+    context.seasonId,
+    context.teamId,
+    context.userId,
+    playerId,
+    profile.data,
+    profile.status,
+    taxonomy.data?.subCategory?.subCategoryId,
+    taxonomy.status,
+  ])
 
   if (!playerId)
     return <main className="center error">Identifiant joueuse invalide.</main>
@@ -100,6 +139,8 @@ export function PlayerProfilePage() {
           context={testsContext}
           playerId={playerId}
           authorized={canReadTests}
+          player={profile.data.player}
+          taxonomy={taxonomy.data}
         />
       </main>
     </>

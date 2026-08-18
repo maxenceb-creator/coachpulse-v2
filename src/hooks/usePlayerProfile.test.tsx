@@ -26,6 +26,12 @@ const alice = {
   createdAt: new Date(),
   updatedAt: new Date(),
 }
+const lina = {
+  ...alice,
+  playerId: 'lina',
+  firstName: 'Lina',
+  birthDate: new Date('2013-01-01T00:00:00.000Z'),
+}
 const context = (teamId = 'team-a'): PlayerProfileHookContext => ({
   userId: 'user-a',
   activeRoleId: 'coach',
@@ -48,6 +54,7 @@ describe('usePlayerProfile — cache roster partagé', () => {
     vi.mocked(playersService.listScopedPlayers).mockResolvedValue([alice])
     vi.mocked(playersService.getProfileIdentity).mockReturnValue({
       player: alice,
+      rosterCount: 1,
     })
   })
 
@@ -79,15 +86,40 @@ describe('usePlayerProfile — cache roster partagé', () => {
     )
   })
 
-  it('recharge une fois dans la nouvelle Team', async () => {
+  it('isole les rosters U13F et U14F dans les deux sens', async () => {
+    vi.mocked(playersService.listScopedPlayers).mockImplementation(
+      async ({ teamId }) => (teamId === 'team-a' ? [alice] : [lina]),
+    )
+    vi.mocked(playersService.getProfileIdentity).mockImplementation(
+      (_context, playerId, roster) => ({
+        player: roster.find((player) => player.playerId === playerId)!,
+        rosterCount: roster.length,
+      }),
+    )
     const { result, rerender } = renderHook(
-      ({ teamId }) => usePlayerProfile(context(teamId), 'alice'),
-      { initialProps: { teamId: 'team-a' }, wrapper },
+      ({ teamId, playerId }) => usePlayerProfile(context(teamId), playerId),
+      { initialProps: { teamId: 'team-a', playerId: 'alice' }, wrapper },
     )
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    rerender({ teamId: 'team-b' })
+    expect(result.current.data?.player.playerId).toBe('alice')
+    rerender({ teamId: 'team-b', playerId: 'lina' })
     await waitFor(() =>
-      expect(playersService.listScopedPlayers).toHaveBeenCalledTimes(2),
+      expect(result.current.data?.player.playerId).toBe('lina'),
     )
+    rerender({ teamId: 'team-a', playerId: 'alice' })
+    await waitFor(() =>
+      expect(result.current.data?.player.playerId).toBe('alice'),
+    )
+    expect(playersService.listScopedPlayers).toHaveBeenCalledTimes(2)
+    expect(
+      client.getQueryData(
+        queryKeys.players.roster('user-a', 'coach', 'team-a', 'season-a'),
+      ),
+    ).toEqual([alice])
+    expect(
+      client.getQueryData(
+        queryKeys.players.roster('user-a', 'coach', 'team-b', 'season-a'),
+      ),
+    ).toEqual([lina])
   })
 })

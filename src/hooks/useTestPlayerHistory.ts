@@ -6,6 +6,7 @@ import { buildPlayerHistory } from '../services/testPlayerHistoryService'
 import { TestsDomainError } from '../services/testsService'
 import { hasPermission } from '../services/permissionsService'
 import type { TestHookContext } from './useTestSession'
+import type { Category, Player, SubCategory } from '../types/domain'
 
 const COMMON_STALE_TIME = 5 * 60 * 1000
 const SESSIONS_STALE_TIME = 60 * 1000
@@ -117,6 +118,10 @@ export const useTestPlayerRoster = (context: TestHookContext) => {
 export const useTestPlayerHistory = (
   context: TestHookContext,
   playerId: string,
+  resolved?: {
+    player: Player
+    taxonomy?: { category: Category | null; subCategory?: SubCategory }
+  },
 ) => {
   const client = useQueryClient()
   return useQuery({
@@ -170,36 +175,60 @@ export const useTestPlayerHistory = (
         context.seasonId,
         playerId,
       )
-      const [players, sessions] = await Promise.all([
-        timed(
-          'roster',
-          rosterKey,
-          () => testPlayerHistoryService.listScopedPlayers(serviceContext),
-          COMMON_STALE_TIME,
-        ),
+      const rosterPromise = resolved
+        ? Promise.resolve([resolved.player])
+        : timed(
+            'roster',
+            rosterKey,
+            () => testPlayerHistoryService.listScopedPlayers(serviceContext),
+            COMMON_STALE_TIME,
+          )
+      if (resolved) cache.roster = 'hit'
+      const resultsPromise = resolved
+        ? timed(
+            'results',
+            resultsKey,
+            () =>
+              testPlayerHistoryService.listPlayerResults(
+                serviceContext,
+                playerId,
+              ),
+            RESULTS_STALE_TIME,
+          )
+        : undefined
+      const [players, sessions, prefetchedResults] = await Promise.all([
+        rosterPromise,
         timed(
           'sessions',
           sessionsKey,
           () => testPlayerHistoryService.listCompletedSessions(serviceContext),
           SESSIONS_STALE_TIME,
         ),
+        resultsPromise,
       ])
       const player = players.find((item) => item.playerId === playerId)
       if (!player) throw new TestsDomainError('PERMISSION_DENIED')
-      const results = await timed(
-        'results',
-        resultsKey,
-        () =>
-          testPlayerHistoryService.listPlayerResults(serviceContext, playerId),
-        RESULTS_STALE_TIME,
-      )
+      const results =
+        prefetchedResults ??
+        (await timed(
+          'results',
+          resultsKey,
+          () =>
+            testPlayerHistoryService.listPlayerResults(
+              serviceContext,
+              playerId,
+            ),
+          RESULTS_STALE_TIME,
+        ))
       const relevantSessionIds = new Set(
         results.map(({ testSessionId }) => testSessionId),
       )
       const categoryId =
         sessions.find(({ testSessionId }) =>
           relevantSessionIds.has(testSessionId),
-        )?.categoryId ?? ''
+        )?.categoryId ??
+        resolved?.taxonomy?.category?.categoryId ??
+        ''
       const taxonomyKey = queryKeys.tests.playerHistoryTaxonomy(
         context.uid,
         context.roleId,
@@ -207,16 +236,27 @@ export const useTestPlayerHistory = (
         context.seasonId,
         categoryId,
       )
-      const taxonomy = await timed(
-        'taxonomy',
-        taxonomyKey,
-        () => testPlayerHistoryService.getTaxonomy(serviceContext, categoryId),
-        COMMON_STALE_TIME,
-      )
-      const subCategory = taxonomy.subCategories.find(
-        ({ birthYearRule }) =>
-          birthYearRule === player.birthDate.getUTCFullYear(),
-      )
+      const taxonomy = resolved?.taxonomy
+        ? {
+            category: resolved.taxonomy.category,
+            subCategories: resolved.taxonomy.subCategory
+              ? [resolved.taxonomy.subCategory]
+              : [],
+          }
+        : await timed(
+            'taxonomy',
+            taxonomyKey,
+            () =>
+              testPlayerHistoryService.getTaxonomy(serviceContext, categoryId),
+            COMMON_STALE_TIME,
+          )
+      if (resolved?.taxonomy) cache.taxonomy = 'hit'
+      const subCategory =
+        resolved?.taxonomy?.subCategory ??
+        taxonomy.subCategories.find(
+          ({ birthYearRule }) =>
+            birthYearRule === player.birthDate.getUTCFullYear(),
+        )
       const definitionRefs = [
         ...new Map(
           results.map((result) => [
@@ -246,24 +286,25 @@ export const useTestPlayerHistory = (
           ),
         ),
       )
-      const benchmarksPromise = subCategory
-        ? timed(
-            'benchmarks',
-            queryKeys.tests.benchmarks(
-              context.uid,
-              context.roleId,
-              context.teamId,
-              context.seasonId,
-              subCategory.subCategoryId,
-            ),
-            () =>
-              testPlayerHistoryService.getBenchmarks(
-                serviceContext,
+      const benchmarksPromise =
+        subCategory && definitionRefs.length
+          ? timed(
+              'benchmarks',
+              queryKeys.tests.benchmarks(
+                context.uid,
+                context.roleId,
+                context.teamId,
+                context.seasonId,
                 subCategory.subCategoryId,
               ),
-            COMMON_STALE_TIME,
-          )
-        : Promise.resolve([])
+              () =>
+                testPlayerHistoryService.getBenchmarks(
+                  serviceContext,
+                  subCategory.subCategoryId,
+                ),
+              COMMON_STALE_TIME,
+            )
+          : Promise.resolve([])
       const [definitions, benchmarks] = await Promise.all([
         definitionsPromise,
         benchmarksPromise,

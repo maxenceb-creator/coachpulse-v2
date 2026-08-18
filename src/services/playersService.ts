@@ -62,7 +62,7 @@ export const playersService = {
       throw new PlayerProfileError('PERMISSION_DENIED')
     const player = roster.find((item) => item.playerId === playerId)
     if (!player) throw new PlayerProfileError('PLAYER_OUT_OF_SCOPE')
-    return { player }
+    return { player, rosterCount: roster.length }
   },
 
   async getProfileTaxonomy(context: PlayerProfileContext, birthYear: number) {

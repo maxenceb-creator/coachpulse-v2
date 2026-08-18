@@ -18,6 +18,17 @@ const context: TestHookContext = {
   accesses: [],
   securityContextReady: true,
 }
+const player = {
+  playerId: 'player-a',
+  firstName: 'Alice',
+  lastName: 'Martin',
+  birthDate: new Date('2014-01-01T00:00:00.000Z'),
+  playerProfile: 'MIDFIELDER' as const,
+  preferredFoot: 'RIGHT' as const,
+  status: 'ACTIVE' as const,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
 const metric = (direction: 'HIGHER_IS_BETTER' | 'LOWER_IS_BETTER') => ({
   metricKey: direction === 'HIGHER_IS_BETTER' ? 'HEIGHT' : 'TIME',
   label: direction === 'HIGHER_IS_BETTER' ? 'Hauteur' : 'Temps',
@@ -83,6 +94,7 @@ const renderSection = (authorized = true) =>
         context={context}
         playerId="player-a"
         authorized={authorized}
+        player={player}
       />
     </MemoryRouter>,
   )
@@ -154,6 +166,7 @@ describe('PlayerTestsSection', () => {
           context={context}
           playerId="player-a"
           authorized={false}
+          player={player}
         />
       </MemoryRouter>,
     )

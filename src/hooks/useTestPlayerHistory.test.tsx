@@ -221,4 +221,96 @@ describe('useTestPlayerHistory cache performance', () => {
     expect(mocks.getDefinition).toHaveBeenCalledTimes(2)
     expect(mocks.getBenchmarks).toHaveBeenCalledTimes(2)
   })
+
+  it('sépare U13F et U14F, puis réutilise chaque cache sans nouvelle lecture', async () => {
+    const alice = {
+      playerId: 'alice',
+      firstName: 'Alice',
+      lastName: 'Martin',
+      birthDate: new Date('2014-01-01'),
+      playerProfile: 'MIDFIELDER' as const,
+      preferredFoot: 'RIGHT' as const,
+      status: 'ACTIVE' as const,
+      createdAt: date,
+      updatedAt: date,
+    }
+    const lina = { ...alice, playerId: 'lina', firstName: 'Lina' }
+    mocks.listCompletedSessions.mockImplementation(async ({ teamId }) =>
+      teamId === 'u13' ? [session(teamId)] : [],
+    )
+    mocks.listPlayerResults.mockImplementation(async ({ teamId }, playerId) =>
+      teamId === 'u13' ? [result(playerId, teamId)] : [],
+    )
+    const taxonomy = {
+      category: {
+        categoryId: 'category-u13',
+        seasonId: 'season',
+        name: 'U13F',
+        subCategoryIds: ['u13'],
+        status: 'ACTIVE' as const,
+        createdAt: date,
+        updatedAt: date,
+      },
+      subCategory: {
+        subCategoryId: 'u13',
+        seasonId: 'season',
+        name: 'U13F',
+        birthYearRule: 2014,
+        createdAt: date,
+        updatedAt: date,
+      },
+    }
+    const { result: hook, rerender } = renderHook(
+      ({ teamId, player, resolvedTaxonomy }) =>
+        useTestPlayerHistory(context(teamId), player.playerId, {
+          player,
+          taxonomy: resolvedTaxonomy,
+        }),
+      {
+        initialProps: {
+          teamId: 'u13',
+          player: alice,
+          resolvedTaxonomy: taxonomy,
+        },
+        wrapper,
+      },
+    )
+    await waitFor(() => expect(hook.current.data?.histories).toHaveLength(1))
+
+    rerender({
+      teamId: 'u14',
+      player: lina,
+      resolvedTaxonomy: {
+        category: {
+          categoryId: 'category-u14',
+          seasonId: 'season',
+          name: 'U14F',
+          subCategoryIds: ['u14'],
+          status: 'ACTIVE' as const,
+          createdAt: date,
+          updatedAt: date,
+        },
+        subCategory: {
+          subCategoryId: 'u14',
+          seasonId: 'season',
+          name: 'U14F',
+          birthYearRule: 2013,
+          createdAt: date,
+          updatedAt: date,
+        },
+      },
+    })
+    await waitFor(() => expect(hook.current.data?.histories).toEqual([]))
+    expect(hook.current.data?.player.playerId).toBe('lina')
+
+    rerender({ teamId: 'u13', player: alice, resolvedTaxonomy: taxonomy })
+    await waitFor(() => expect(hook.current.data?.histories).toHaveLength(1))
+
+    expect(mocks.listScopedPlayers).not.toHaveBeenCalled()
+    expect(mocks.getTaxonomy).not.toHaveBeenCalled()
+    expect(mocks.listCompletedSessions).toHaveBeenCalledTimes(2)
+    expect(mocks.listPlayerResults).toHaveBeenCalledTimes(2)
+    expect(mocks.getDefinition).toHaveBeenCalledTimes(1)
+    expect(mocks.getBenchmarks).toHaveBeenCalledTimes(1)
+  })
 })

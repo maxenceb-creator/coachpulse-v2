@@ -1764,5 +1764,10 @@ naissance ; sa latence ou son erreur ne bloque pas l'identité.
 Chaque section métier possède son propre cycle de chargement et ses propres
 permissions. La section Tests réutilise `useTestPlayerHistory` et les query keys
 PR10/PR11 ; une erreur Tests ne remonte donc pas au chargement de l'identité.
+Sur la fiche, l'identité déjà validée et la taxonomie déjà résolue sont fournies
+à cette section : elle ne relit ni le roster ni la taxonomie. Les sessions et
+les résultats de la joueuse peuvent alors être chargés en parallèle. Un contexte
+Team sans résultat conserve sa taxonomie propre et produit immédiatement un état
+vide, sans emprunter le cache d'une autre Team.
 Les futures sections Présences, Matchs, charge, blessures et médical suivront ce
 modèle sans transformer la fiche en nouvelle source de vérité.

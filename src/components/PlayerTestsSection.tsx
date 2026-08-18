@@ -4,6 +4,7 @@ import { useTestPlayerHistory } from '../hooks/useTestPlayerHistory'
 import type { TestHookContext } from '../hooks/useTestSession'
 import { formatSignedTestValue } from '../services/testHistoryFormatting'
 import type { TestMetricDefinition } from '../types/domain'
+import type { Category, Player, SubCategory } from '../types/domain'
 import { TestEvolutionChart } from './TestEvolutionChart'
 
 const formatMetric = (
@@ -18,31 +19,42 @@ export function PlayerTestsSection({
   context,
   playerId,
   authorized,
+  player,
+  taxonomy,
 }: {
   context: TestHookContext
   playerId: string
   authorized: boolean
+  player: Player
+  taxonomy?: { category: Category | null; subCategory?: SubCategory }
 }) {
-  const history = useTestPlayerHistory(context, playerId)
+  const history = useTestPlayerHistory(context, playerId, { player, taxonomy })
   const startedAt = useRef(performance.now())
   useEffect(() => {
     if (!import.meta.env.DEV || !authorized) return
     if (history.isPending)
-      console.debug('[PlayerProfile PERF DEV]', {
-        step: 'tests block start',
+      console.debug('[PLAYER PROFILE STEP DEV]', {
+        step: 'tests start',
         playerId,
         teamId: context.teamId,
       })
     if (history.isSuccess || history.isError)
-      console.debug('[PlayerProfile PERF DEV]', {
-        step: 'tests block end',
+      console.debug('[PLAYER PROFILE STEP DEV]', {
+        step: 'tests end',
         playerId,
         status: history.isSuccess ? 'success' : 'error',
         totalMs: performance.now() - startedAt.current,
+        errorCode:
+          history.error instanceof Error && 'code' in history.error
+            ? history.error.code
+            : undefined,
+        errorMessage:
+          history.error instanceof Error ? history.error.message : undefined,
       })
   }, [
     authorized,
     context.teamId,
+    history.error,
     history.isError,
     history.isPending,
     history.isSuccess,
