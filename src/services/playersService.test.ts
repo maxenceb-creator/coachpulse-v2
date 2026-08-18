@@ -104,7 +104,7 @@ describe('comptage effectif des joueuses par Team', () => {
 describe('fiche joueuse scopée', () => {
   afterEach(() => vi.clearAllMocks())
 
-  it('retourne identité, affectation, catégorie et sous-catégorie autorisées', async () => {
+  it('retourne séparément roster, identité et taxonomie autorisés', async () => {
     vi.mocked(repositories.assignmentsForTeam).mockResolvedValue([
       assignment('player-a', 'PRIMARY', '2020-01-01T00:00:00.000Z'),
     ])
@@ -129,28 +129,28 @@ describe('fiche joueuse scopée', () => {
       },
     ])
 
+    const roster = await playersService.listScopedPlayers(profileContext)
+    expect(
+      playersService.getProfileIdentity(profileContext, 'player-a', roster),
+    ).toMatchObject({ player: { playerId: 'player-a' } })
     await expect(
-      playersService.getProfile(profileContext, 'player-a'),
-    ).resolves.toMatchObject({
-      player: { playerId: 'player-a' },
-      subCategory: { name: 'U13' },
-    })
+      playersService.getProfileTaxonomy(profileContext, 2013),
+    ).resolves.toMatchObject({ subCategory: { name: 'U13' } })
   })
 
-  it('refuse une joueuse hors du roster actif avant de lire son identité', async () => {
-    vi.mocked(repositories.assignmentsForTeam).mockResolvedValue([])
-    await expect(
-      playersService.getProfile(profileContext, 'player-b'),
-    ).rejects.toEqual(new PlayerProfileError('PLAYER_OUT_OF_SCOPE'))
-    expect(repositories.activePlayers).not.toHaveBeenCalled()
+  it('refuse une joueuse absente du roster déjà validé', () => {
+    expect(() =>
+      playersService.getProfileIdentity(profileContext, 'player-b', [player]),
+    ).toThrow(new PlayerProfileError('PLAYER_OUT_OF_SCOPE'))
   })
 
-  it('refuse la fiche sans players.read', async () => {
-    await expect(
-      playersService.getProfile(
+  it('refuse la fiche sans players.read', () => {
+    expect(() =>
+      playersService.getProfileIdentity(
         { ...profileContext, accesses: [], teamId: 'team-b' },
         'player-a',
+        [player],
       ),
-    ).rejects.toEqual(new PlayerProfileError('PERMISSION_DENIED'))
+    ).toThrow(new PlayerProfileError('PERMISSION_DENIED'))
   })
 })

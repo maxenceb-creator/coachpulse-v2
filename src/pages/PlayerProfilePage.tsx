@@ -3,7 +3,10 @@ import { useApp } from '../app/AppContext'
 import { useAuth } from '../auth/AuthProvider'
 import { PlayerProfileHeader } from '../components/PlayerProfileHeader'
 import { PlayerTestsSection } from '../components/PlayerTestsSection'
-import { usePlayerProfile } from '../hooks/usePlayerProfile'
+import {
+  usePlayerProfile,
+  usePlayerProfileTaxonomy,
+} from '../hooks/usePlayerProfile'
 import type { TestHookContext } from '../hooks/useTestSession'
 import { hasPermission } from '../services/permissionsService'
 import { PlayerProfileError } from '../services/playersService'
@@ -23,6 +26,10 @@ export function PlayerProfilePage() {
     securityContextReady: app.securityContextReady,
   }
   const profile = usePlayerProfile(context, playerId)
+  const taxonomy = usePlayerProfileTaxonomy(
+    context,
+    profile.data?.player.birthDate.getUTCFullYear(),
+  )
   const testsContext: TestHookContext = {
     uid: context.userId,
     roleId: context.activeRoleId,
@@ -76,9 +83,19 @@ export function PlayerProfilePage() {
         <PlayerProfileHeader
           player={profile.data.player}
           team={team}
-          category={profile.data.category}
-          subCategory={profile.data.subCategory}
+          category={taxonomy.data?.category}
+          subCategory={taxonomy.data?.subCategory}
         />
+        {taxonomy.isPending ? (
+          <p className="profile-taxonomy-status">
+            Chargement du contexte sportif…
+          </p>
+        ) : null}
+        {taxonomy.isError ? (
+          <p className="profile-taxonomy-status error">
+            Impossible de charger la catégorie de cette joueuse.
+          </p>
+        ) : null}
         <PlayerTestsSection
           context={testsContext}
           playerId={playerId}

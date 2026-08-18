@@ -1754,9 +1754,12 @@ vérité permanente dans Player.
 # Addendum PR12 — Fondation de la fiche joueuse
 
 La route `/players/:playerId` compose des sections de domaine indépendantes.
-L'identité et le contexte sportif sont chargés par une query `players.profile`
-scopée par `uid + activeRoleId + teamId + seasonId + playerId`. Le service
-vérifie `players.read` et l'affectation effective avant de lire la joueuse.
+L'identité utilise le roster partagé `players.roster`, scopé par
+`uid + activeRoleId + teamId + seasonId`, puis une query `players.profile`
+valide le `playerId` dans ce roster. Le service vérifie `players.read` et
+l'affectation effective avant d'exposer la joueuse. La taxonomie
+catégorie/sous-catégorie possède une query distincte incluant l'année de
+naissance ; sa latence ou son erreur ne bloque pas l'identité.
 
 Chaque section métier possède son propre cycle de chargement et ses propres
 permissions. La section Tests réutilise `useTestPlayerHistory` et les query keys

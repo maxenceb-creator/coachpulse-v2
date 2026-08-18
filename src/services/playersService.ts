@@ -22,7 +22,7 @@ export class PlayerProfileError extends Error {
 }
 
 export const playersService = {
-  async getProfile(context: PlayerProfileContext, playerId: string) {
+  async listScopedPlayers(context: PlayerProfileContext) {
     if (
       !hasPermission(context.accesses, {
         userId: context.userId,
@@ -32,19 +32,40 @@ export const playersService = {
       })
     )
       throw new PlayerProfileError('PERMISSION_DENIED')
-
     const assignments = await repositories.assignmentsForTeam(
       context.teamId,
       context.seasonId,
     )
-    const assignment = assignments.find(
-      (item) =>
-        item.playerId === playerId && isAssignmentEffective(item, new Date()),
-    )
-    if (!assignment) throw new PlayerProfileError('PLAYER_OUT_OF_SCOPE')
+    const playerIds = [
+      ...new Set(
+        assignments
+          .filter((item) => isAssignmentEffective(item, new Date()))
+          .map(({ playerId }) => playerId),
+      ),
+    ]
+    return repositories.activePlayers(playerIds)
+  },
 
-    const player = (await repositories.activePlayers([playerId]))[0]
-    if (!player) throw new PlayerProfileError('PLAYER_NOT_FOUND')
+  getProfileIdentity(
+    context: PlayerProfileContext,
+    playerId: string,
+    roster: Awaited<ReturnType<typeof repositories.activePlayers>>,
+  ) {
+    if (
+      !hasPermission(context.accesses, {
+        userId: context.userId,
+        activeRoleId: context.activeRoleId,
+        teamId: context.teamId,
+        permissionKey: 'players.read',
+      })
+    )
+      throw new PlayerProfileError('PERMISSION_DENIED')
+    const player = roster.find((item) => item.playerId === playerId)
+    if (!player) throw new PlayerProfileError('PLAYER_OUT_OF_SCOPE')
+    return { player }
+  },
+
+  async getProfileTaxonomy(context: PlayerProfileContext, birthYear: number) {
     const category = context.categoryId
       ? await repositories.category(context.categoryId)
       : null
@@ -52,10 +73,9 @@ export const playersService = {
       ? await repositories.subCategories(category.subCategoryIds)
       : []
     const subCategory = subCategories.find(
-      ({ birthYearRule }) =>
-        birthYearRule === player.birthDate.getUTCFullYear(),
+      ({ birthYearRule }) => birthYearRule === birthYear,
     )
-    return { player, assignment, category, subCategory }
+    return { category, subCategory }
   },
   async countEffectiveByTeam(
     teamId: string,

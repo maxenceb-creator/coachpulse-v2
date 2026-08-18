@@ -84,6 +84,9 @@
 .player-domain-section {
   padding: 1.5rem;
 }
+.profile-taxonomy-status {
+  margin: -0.75rem 0 0;
+}
 .section-heading {
   display: flex;
   align-items: flex-start;

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../query/queryKeys'
 import { testPlayerHistoryService } from '../services/appTestsService'
@@ -31,19 +32,87 @@ const enabled = (context: TestHookContext) =>
     permissionKey: 'tests.read',
   })
 
-export const useTestPlayerRoster = (context: TestHookContext) =>
-  useQuery({
-    queryKey: queryKeys.tests.playerRoster(
-      context.uid,
-      context.roleId,
-      context.teamId,
-      context.seasonId,
-    ),
-    queryFn: () =>
-      testPlayerHistoryService.listScopedPlayers(contextFor(context)),
+export const useTestPlayerRoster = (context: TestHookContext) => {
+  const client = useQueryClient()
+  const key = queryKeys.tests.playerRoster(
+    context.uid,
+    context.roleId,
+    context.teamId,
+    context.seasonId,
+  )
+  const loggedKey = useRef('')
+  const finishedKey = useRef('')
+  const startedAt = useRef(performance.now())
+  useEffect(() => {
+    const serialized = JSON.stringify(key)
+    if (!import.meta.env.DEV || loggedKey.current === serialized) return
+    loggedKey.current = serialized
+    finishedKey.current = ''
+    startedAt.current = performance.now()
+    console.debug('[PlayerRoster PERF DEV]', {
+      step: 'start',
+      cache: client.getQueryData(key) === undefined ? 'miss' : 'hit',
+      teamId: context.teamId,
+      roleId: context.roleId,
+      seasonId: context.seasonId,
+      enabled: enabled(context),
+    })
+  }, [client, context, key])
+  const query = useQuery({
+    queryKey: key,
+    queryFn: async () => {
+      const startedAt = performance.now()
+      if (import.meta.env.DEV)
+        console.debug('[PlayerRoster PERF DEV]', {
+          step: 'Firestore start',
+          source: 'test-player-history',
+          teamId: context.teamId,
+        })
+      try {
+        const players = await testPlayerHistoryService.listScopedPlayers(
+          contextFor(context),
+        )
+        if (import.meta.env.DEV)
+          console.debug('[PlayerRoster PERF DEV]', {
+            step: 'Firestore success',
+            source: 'test-player-history',
+            count: players.length,
+            totalMs: performance.now() - startedAt,
+          })
+        return players
+      } catch (error) {
+        if (import.meta.env.DEV)
+          console.error('[PlayerRoster PERF DEV]', {
+            step: 'Firestore error',
+            source: 'test-player-history',
+            totalMs: performance.now() - startedAt,
+            error,
+          })
+        throw error
+      }
+    },
     enabled: enabled(context),
     staleTime: COMMON_STALE_TIME,
   })
+  useEffect(() => {
+    const serialized = JSON.stringify(key)
+    if (
+      !import.meta.env.DEV ||
+      finishedKey.current === serialized ||
+      (!query.isSuccess && !query.isError)
+    )
+      return
+    finishedKey.current = serialized
+    console.debug('[PlayerRoster PERF DEV]', {
+      step: 'end',
+      status: query.isSuccess ? 'success' : 'error',
+      count: query.data?.length,
+      totalMs: performance.now() - startedAt.current,
+      teamId: context.teamId,
+    })
+  }, [context.teamId, key, query.data, query.isError, query.isSuccess])
+  return query
+}
 
 export const useTestPlayerHistory = (
   context: TestHookContext,

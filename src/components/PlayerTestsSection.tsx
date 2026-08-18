@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useTestPlayerHistory } from '../hooks/useTestPlayerHistory'
 import type { TestHookContext } from '../hooks/useTestSession'
@@ -23,6 +24,30 @@ export function PlayerTestsSection({
   authorized: boolean
 }) {
   const history = useTestPlayerHistory(context, playerId)
+  const startedAt = useRef(performance.now())
+  useEffect(() => {
+    if (!import.meta.env.DEV || !authorized) return
+    if (history.isPending)
+      console.debug('[PlayerProfile PERF DEV]', {
+        step: 'tests block start',
+        playerId,
+        teamId: context.teamId,
+      })
+    if (history.isSuccess || history.isError)
+      console.debug('[PlayerProfile PERF DEV]', {
+        step: 'tests block end',
+        playerId,
+        status: history.isSuccess ? 'success' : 'error',
+        totalMs: performance.now() - startedAt.current,
+      })
+  }, [
+    authorized,
+    context.teamId,
+    history.isError,
+    history.isPending,
+    history.isSuccess,
+    playerId,
+  ])
   if (!authorized) return null
 
   if (history.isPending)

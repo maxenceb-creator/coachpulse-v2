@@ -1,5 +1,12 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
+import { useEffect, useState } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TestsPage } from './TestsPage'
@@ -85,6 +92,22 @@ const historySuccess = {
   data: { player: alice, subCategory: undefined, histories: [] },
 }
 
+let resolveSlowRoster: (() => void) | undefined
+function useSlowRoster() {
+  const [players, setPlayers] = useState<(typeof alice)[]>()
+  useEffect(() => {
+    const pending = new Promise<void>((resolve) => {
+      resolveSlowRoster = resolve
+    })
+    void pending.then(() => setPlayers([alice]))
+  }, [])
+  return {
+    isPending: !players,
+    isError: false,
+    data: players,
+  }
+}
+
 function TestRoutes({ initial = '/tests' }: { initial?: string }) {
   return (
     <MemoryRouter initialEntries={[initial]}>
@@ -111,7 +134,8 @@ describe('navigation SPA vers l’historique joueuse', () => {
     mocks.history.mockReturnValue(historySuccess)
   })
 
-  it('affiche le sélecteur sur cache froid puis charge une joueuse sans reload', () => {
+  it('affiche le sélecteur avec un roster lent puis charge sans reload', async () => {
+    mocks.roster.mockImplementation(useSlowRoster)
     const view = render(<TestRoutes />)
     fireEvent.click(
       screen.getByRole('link', { name: 'Historique par joueuse' }),
@@ -124,12 +148,8 @@ describe('navigation SPA vers l’historique joueuse', () => {
     ).toBeInTheDocument()
     expect(mocks.history).not.toHaveBeenCalled()
 
-    mocks.roster.mockReturnValue({
-      isPending: false,
-      isError: false,
-      data: [alice],
-    })
-    view.rerender(<TestRoutes />)
+    resolveSlowRoster?.()
+    await waitFor(() => expect(screen.getByLabelText('Joueuse')).toBeEnabled())
     fireEvent.change(screen.getByLabelText('Joueuse'), {
       target: { value: 'alice' },
     })
@@ -141,6 +161,21 @@ describe('navigation SPA vers l’historique joueuse', () => {
       expect.objectContaining({ teamId: 'team-a', seasonId: 'season-a' }),
       'alice',
     )
+    view.unmount()
+  })
+
+  it('stabilise le sélecteur quand le roster échoue', () => {
+    mocks.roster.mockReturnValue({
+      isPending: false,
+      isError: true,
+      data: undefined,
+    })
+    render(<TestRoutes initial="/tests/players" />)
+    expect(screen.getByLabelText('Joueuse')).toBeEnabled()
+    expect(
+      screen.getByText('Impossible de charger les joueuses.'),
+    ).toBeInTheDocument()
+    expect(mocks.history).not.toHaveBeenCalled()
   })
 
   it('supporte accès direct, retour Tests, cache chaud et nouvelle navigation', () => {

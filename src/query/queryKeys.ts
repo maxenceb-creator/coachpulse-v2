@@ -23,6 +23,26 @@ export const queryKeys = {
       playerId: string,
     ) =>
       ['players', 'profile', uid, roleId, teamId, seasonId, playerId] as const,
+    roster: (uid: string, roleId: string, teamId: string, seasonId: string) =>
+      ['players', 'roster', uid, roleId, teamId, seasonId] as const,
+    taxonomy: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      categoryId: string,
+      birthYear: number | string,
+    ) =>
+      [
+        'players',
+        'taxonomy',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        categoryId,
+        birthYear,
+      ] as const,
   },
   tests: {
     catalogue: (
@@ -180,7 +200,7 @@ export const queryKeys = {
       roleId: string,
       teamId: string,
       seasonId: string,
-    ) => ['tests', 'playerRoster', uid, roleId, teamId, seasonId] as const,
+    ) => queryKeys.players.roster(uid, roleId, teamId, seasonId),
     playerHistorySessions: (
       uid: string,
       roleId: string,
