@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { accessSchema, playerSchema, teamSchema } from './schemas'
+import {
+  accessSchema,
+  attendanceSchema,
+  playerSchema,
+  teamSchema,
+} from './schemas'
 const timestamp = new Date('2026-08-01T00:00:00.000Z')
 describe('validation Firestore', () => {
+  it('valide la taxonomie Attendance canonique et refuse un statut divergent', () => {
+    const base = {
+      attendanceId: 'session-a_player-a',
+      sessionId: 'session-a',
+      playerId: 'player-a',
+      recordedByUserId: 'user-a',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+    expect(
+      attendanceSchema.safeParse({ ...base, status: 'INJURED' }).success,
+    ).toBe(true)
+    expect(
+      attendanceSchema.safeParse({ ...base, status: 'POLE' }).success,
+    ).toBe(false)
+  })
   it('refuse teamId dans Player', () =>
     expect(
       playerSchema.safeParse({

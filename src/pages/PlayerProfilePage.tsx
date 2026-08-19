@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useApp } from '../app/AppContext'
 import { useAuth } from '../auth/AuthProvider'
 import { PlayerProfileHeader } from '../components/PlayerProfileHeader'
+import { PlayerAttendanceSection } from '../components/PlayerAttendanceSection'
 import { PlayerTestsSection } from '../components/PlayerTestsSection'
 import {
   usePlayerProfile,
@@ -43,6 +44,12 @@ export function PlayerProfilePage() {
     activeRoleId: context.activeRoleId,
     teamId: context.teamId,
     permissionKey: 'tests.read',
+  })
+  const canReadAttendance = hasPermission(app.accesses, {
+    userId: context.userId,
+    activeRoleId: context.activeRoleId,
+    teamId: context.teamId,
+    permissionKey: 'attendance.read',
   })
   if (!playerId)
     return <main className="center error">Identifiant joueuse invalide.</main>
@@ -102,6 +109,13 @@ export function PlayerProfilePage() {
           player={profile.data.player}
           taxonomy={taxonomy.data}
         />
+        {canReadAttendance ? (
+          <PlayerAttendanceSection
+            context={context}
+            playerId={playerId}
+            authorized
+          />
+        ) : null}
       </main>
     </>
   )

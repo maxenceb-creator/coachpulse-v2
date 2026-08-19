@@ -59,27 +59,53 @@
   font-weight: 800;
 }
 .player-overview,
-.player-tests-summary {
+.player-tests-summary,
+.player-attendance-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   margin: 1.25rem 0 0;
 }
 .player-overview div,
-.player-tests-summary div {
+.player-tests-summary div,
+.player-attendance-summary div {
   background: #f2f6f4;
   border-radius: 0.75rem;
   padding: 0.75rem;
 }
 .player-overview dt,
-.player-tests-summary dt {
+.player-tests-summary dt,
+.player-attendance-summary dt {
   color: #61736d;
   font-size: 0.8rem;
 }
 .player-overview dd,
-.player-tests-summary dd {
+.player-tests-summary dd,
+.player-attendance-summary dd {
   margin: 0.35rem 0 0;
   font-weight: 800;
+}
+.attendance-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-top: 1rem;
+  color: #61736d;
+}
+.attendance-history {
+  margin-top: 1.25rem;
+}
+.attendance-history ul {
+  display: grid;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.attendance-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
 }
 .player-domain-section {
   padding: 1.5rem;
@@ -485,6 +511,7 @@ input {
   }
   .player-overview,
   .player-tests-summary,
+  .player-attendance-summary,
   .metric-summary.compact {
     grid-template-columns: 1fr;
   }

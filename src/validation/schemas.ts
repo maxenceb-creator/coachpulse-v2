@@ -103,6 +103,63 @@ export const assignmentSchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE']),
 })
 
+export const sessionSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    seasonId: z.string().min(1),
+    categoryId: z.string().min(1),
+    title: z.string().optional(),
+    sessionType: z.string().min(1),
+    startDateTime: date,
+    endDateTime: date.optional(),
+    plannedDurationMinutes: z.number().int().nonnegative(),
+    actualDurationMinutes: z.number().int().nonnegative().optional(),
+    status: z.enum(['PLANNED', 'COMPLETED', 'CANCELLED']),
+    createdByUserId: z.string().min(1),
+    createdAt: date,
+    updatedAt: date,
+  })
+  .strict()
+
+export const sessionParticipantSchema = z
+  .object({
+    sessionParticipantId: z.string().min(1),
+    sessionId: z.string().min(1),
+    playerId: z.string().min(1),
+    participationType: z.enum(['EXPECTED', 'INVITED']),
+    addedByUserId: z.string().min(1).optional(),
+    createdAt: date,
+    updatedAt: date,
+  })
+  .strict()
+
+export const attendanceStatusSchema = z.enum([
+  'PRESENT',
+  'LATE',
+  'ABSENT_JUSTIFIED',
+  'ABSENT_UNJUSTIFIED',
+  'INJURED',
+  'SICK',
+  'EXTERNAL_PROGRAM',
+  'EXCUSED',
+])
+
+export const attendanceSchema = z
+  .object({
+    attendanceId: z.string().min(1),
+    sessionId: z.string().min(1),
+    playerId: z.string().min(1),
+    status: attendanceStatusSchema,
+    arrivalDelayMinutes: z.number().int().nonnegative().optional(),
+    participationDurationMinutes: z.number().int().nonnegative().optional(),
+    reason: z.string().optional(),
+    note: z.string().optional(),
+    recordedByUserId: z.string().min(1),
+    createdAt: date,
+    updatedAt: date,
+  })
+  .strict()
+
 const metricKeySchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/)
 
 export const testMetricDefinitionSchema = z

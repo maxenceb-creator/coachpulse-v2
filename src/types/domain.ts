@@ -94,6 +94,56 @@ export type Assignment = {
   status: 'ACTIVE' | 'INACTIVE'
 }
 
+export type Session = {
+  sessionId: string
+  seasonId: string
+  categoryId: string
+  title?: string
+  sessionType: string
+  startDateTime: Date
+  endDateTime?: Date
+  plannedDurationMinutes: number
+  actualDurationMinutes?: number
+  status: 'PLANNED' | 'COMPLETED' | 'CANCELLED'
+  createdByUserId: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type SessionParticipant = {
+  sessionParticipantId: string
+  sessionId: string
+  playerId: string
+  participationType: 'EXPECTED' | 'INVITED'
+  addedByUserId?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type AttendanceStatus =
+  | 'PRESENT'
+  | 'LATE'
+  | 'ABSENT_JUSTIFIED'
+  | 'ABSENT_UNJUSTIFIED'
+  | 'INJURED'
+  | 'SICK'
+  | 'EXTERNAL_PROGRAM'
+  | 'EXCUSED'
+
+export type Attendance = {
+  attendanceId: string
+  sessionId: string
+  playerId: string
+  status: AttendanceStatus
+  arrivalDelayMinutes?: number
+  participationDurationMinutes?: number
+  reason?: string
+  note?: string
+  recordedByUserId: string
+  createdAt: Date
+  updatedAt: Date
+}
+
 export type TestMetricDefinition = {
   metricKey: string
   label: string
