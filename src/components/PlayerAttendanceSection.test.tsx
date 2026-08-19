@@ -7,6 +7,18 @@ import { PlayerAttendanceSection } from './PlayerAttendanceSection'
 vi.mock('../hooks/usePlayerAttendance', () => ({
   usePlayerAttendance: vi.fn(),
 }))
+vi.mock('../services/playerAttendanceService', () => ({
+  attendanceStatusLabels: {
+    PRESENT: 'Présente',
+    LATE: 'Retard',
+    ABSENT_JUSTIFIED: 'Absence justifiée',
+    ABSENT_UNJUSTIFIED: 'Absence non justifiée',
+    INJURED: 'Blessée',
+    SICK: 'Malade',
+    EXTERNAL_PROGRAM: 'Programme extérieur',
+    EXCUSED: 'Dispensée',
+  },
+}))
 
 const context = {
   userId: 'user-a',

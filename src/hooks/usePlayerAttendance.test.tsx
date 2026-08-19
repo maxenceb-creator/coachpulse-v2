@@ -8,11 +8,9 @@ import { playersService } from '../services/playersService'
 import type { PlayerAttendanceHookContext } from './usePlayerAttendance'
 import { usePlayerAttendance } from './usePlayerAttendance'
 
-vi.mock('../services/playerAttendanceService', async (load) => {
-  const actual =
-    await load<typeof import('../services/playerAttendanceService')>()
-  return { ...actual, playerAttendanceService: { getPlayerSummary: vi.fn() } }
-})
+vi.mock('../services/playerAttendanceService', () => ({
+  playerAttendanceService: { getPlayerSummary: vi.fn() },
+}))
 vi.mock('../services/playersService', () => ({
   playersService: { listScopedPlayers: vi.fn() },
 }))

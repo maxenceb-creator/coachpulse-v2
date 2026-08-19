@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Attendance, Player, Session, TeamAccess } from '../types/domain'
-import { attendanceRepository } from '../repositories/attendanceRepository'
+import type { attendanceRepository } from '../repositories/attendanceRepository'
 import {
   buildPlayerAttendanceSummary,
   createPlayerAttendanceService,
   PlayerAttendanceError,
 } from './playerAttendanceService'
+
+vi.mock('../repositories/attendanceRepository', () => ({
+  attendanceRepository: {},
+}))
 
 const date = new Date('2026-08-12T18:00:00.000Z')
 const session = (sessionId: string, month = 7): Session => ({
