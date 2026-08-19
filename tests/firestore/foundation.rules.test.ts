@@ -113,7 +113,7 @@ beforeEach(async () => {
         status: 'ACTIVE',
         rolePermissions: {
           coach: {
-            permissions: ['players.read', 'tests.read'],
+            permissions: ['players.read', 'tests.read', 'attendance.read'],
             medicalAccessLevel: 'NONE',
           },
         },
@@ -630,6 +630,49 @@ describe('Security Rules Présences fiche joueuse', () => {
         ),
       ),
     )
+  })
+
+  it('autorise la query Sessions exacte quand le résultat DEV est vide', async () => {
+    const snapshot = await assertSucceeds(
+      getDocs(
+        query(
+          collection(activeDb(), 'sessions'),
+          where('seasonId', '==', seasonId),
+          where('categoryId', '==', 'category-a'),
+          where('status', '==', 'COMPLETED'),
+          where('startDateTime', '<=', new Date('2026-08-01T00:00:00.000Z')),
+          orderBy('startDateTime', 'desc'),
+        ),
+      ),
+    )
+    expect(snapshot.empty).toBe(true)
+  })
+
+  it('autorise la même query et le scope joueuse après passage U13F vers U14F', async () => {
+    const db = activeDb()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('coach', 'team-b'),
+      }),
+    )
+    const sessions = await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'sessions'),
+          where('seasonId', '==', seasonId),
+          where('categoryId', '==', 'category-b'),
+          where('status', '==', 'COMPLETED'),
+          where('startDateTime', '<=', new Date('2026-08-19T00:00:00.000Z')),
+          orderBy('startDateTime', 'desc'),
+        ),
+      ),
+    )
+    expect(sessions.docs.map(({ id }) => id)).toEqual(['training-b'])
+    await assertSucceeds(
+      getDoc(doc(db, 'sessionParticipants/training-b_player-b')),
+    )
+    await assertSucceeds(getDoc(doc(db, 'attendance/training-b_player-b')))
+    await assertFails(getDoc(doc(db, 'attendance/training-a_player-a')))
   })
 
   it('refuse permission absente, Team étrangère et joueuse hors scope', async () => {
