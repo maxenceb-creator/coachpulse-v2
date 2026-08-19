@@ -87,7 +87,12 @@ beforeEach(async () => {
         status: 'ACTIVE',
         rolePermissions: {
           coach: {
-            permissions: ['players.read', 'tests.read', 'tests.write'],
+            permissions: [
+              'players.read',
+              'tests.read',
+              'tests.write',
+              'attendance.read',
+            ],
             medicalAccessLevel: 'NONE',
           },
           analyst: { permissions: [], medicalAccessLevel: 'NONE' },
@@ -108,7 +113,7 @@ beforeEach(async () => {
         status: 'ACTIVE',
         rolePermissions: {
           coach: {
-            permissions: ['players.read', 'tests.read'],
+            permissions: ['players.read', 'tests.read', 'attendance.read'],
             medicalAccessLevel: 'NONE',
           },
         },
@@ -214,6 +219,58 @@ beforeEach(async () => {
         subCategoryId: 'subcat-b',
         seasonId,
         status: 'ACTIVE',
+      }),
+      write('sessions/training-a', {
+        seasonId,
+        categoryId: 'category-a',
+        sessionType: 'TRAINING',
+        startDateTime: new Date('2026-08-12T18:00:00.000Z'),
+        plannedDurationMinutes: 90,
+        status: 'COMPLETED',
+        createdByUserId: 'user-a',
+        createdAt: new Date('2026-08-12T17:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T17:00:00.000Z'),
+      }),
+      write('sessions/training-b', {
+        seasonId,
+        categoryId: 'category-b',
+        sessionType: 'TRAINING',
+        startDateTime: new Date('2026-08-12T18:00:00.000Z'),
+        plannedDurationMinutes: 90,
+        status: 'COMPLETED',
+        createdByUserId: 'user-a',
+        createdAt: new Date('2026-08-12T17:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T17:00:00.000Z'),
+      }),
+      write('sessionParticipants/training-a_player-a', {
+        sessionId: 'training-a',
+        playerId: 'player-a',
+        participationType: 'EXPECTED',
+        createdAt: new Date('2026-08-12T17:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T17:00:00.000Z'),
+      }),
+      write('sessionParticipants/training-b_player-b', {
+        sessionId: 'training-b',
+        playerId: 'player-b',
+        participationType: 'EXPECTED',
+        createdAt: new Date('2026-08-12T17:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T17:00:00.000Z'),
+      }),
+      write('attendance/training-a_player-a', {
+        sessionId: 'training-a',
+        playerId: 'player-a',
+        status: 'PRESENT',
+        recordedByUserId: 'user-a',
+        createdAt: new Date('2026-08-12T20:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T20:00:00.000Z'),
+      }),
+      write('attendance/training-b_player-b', {
+        sessionId: 'training-b',
+        playerId: 'player-b',
+        status: 'PRESENT',
+        recordedByUserId: 'user-a',
+        createdAt: new Date('2026-08-12T20:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T20:00:00.000Z'),
       }),
       write(`seasons/${seasonId}`, {
         name: '2026-2027',
@@ -537,6 +594,111 @@ describe('Security Rules administration Tests PR09', () => {
         definitionData({ createdBy: 'user-forged-role' }),
       ),
     )
+  })
+})
+
+describe('Security Rules Présences fiche joueuse', () => {
+  const activeDb = () => testEnv.authenticatedContext('user-a').firestore()
+
+  it('autorise les queries exactes dans la Team active avec attendance.read', async () => {
+    const db = activeDb()
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'sessions'),
+          where('seasonId', '==', seasonId),
+          where('categoryId', '==', 'category-a'),
+          where('status', '==', 'COMPLETED'),
+          where('startDateTime', '<=', new Date('2026-08-19T00:00:00.000Z')),
+          orderBy('startDateTime', 'desc'),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'sessionParticipants'),
+          where(documentId(), 'in', ['training-a_player-a']),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'attendance'),
+          where(documentId(), 'in', ['training-a_player-a']),
+        ),
+      ),
+    )
+  })
+
+  it('autorise la query Sessions exacte quand le résultat DEV est vide', async () => {
+    const snapshot = await assertSucceeds(
+      getDocs(
+        query(
+          collection(activeDb(), 'sessions'),
+          where('seasonId', '==', seasonId),
+          where('categoryId', '==', 'category-a'),
+          where('status', '==', 'COMPLETED'),
+          where('startDateTime', '<=', new Date('2026-08-01T00:00:00.000Z')),
+          orderBy('startDateTime', 'desc'),
+        ),
+      ),
+    )
+    expect(snapshot.empty).toBe(true)
+  })
+
+  it('autorise la même query et le scope joueuse après passage U13F vers U14F', async () => {
+    const db = activeDb()
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/user-a'), {
+        securityContext: securityContext('coach', 'team-b'),
+      }),
+    )
+    const sessions = await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'sessions'),
+          where('seasonId', '==', seasonId),
+          where('categoryId', '==', 'category-b'),
+          where('status', '==', 'COMPLETED'),
+          where('startDateTime', '<=', new Date('2026-08-19T00:00:00.000Z')),
+          orderBy('startDateTime', 'desc'),
+        ),
+      ),
+    )
+    expect(sessions.docs.map(({ id }) => id)).toEqual(['training-b'])
+    await assertSucceeds(
+      getDoc(doc(db, 'sessionParticipants/training-b_player-b')),
+    )
+    await assertSucceeds(getDoc(doc(db, 'attendance/training-b_player-b')))
+    await assertFails(getDoc(doc(db, 'attendance/training-a_player-a')))
+  })
+
+  it('refuse permission absente, Team étrangère et joueuse hors scope', async () => {
+    const db = activeDb()
+    await updateDoc(doc(db, 'users/user-a'), {
+      securityContext: securityContext('analyst'),
+    })
+    await assertFails(getDoc(doc(db, 'attendance/training-a_player-a')))
+    await updateDoc(doc(db, 'users/user-a'), {
+      securityContext: securityContext('coach'),
+    })
+    await assertFails(getDoc(doc(db, 'attendance/training-b_player-b')))
+    await testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), 'attendance/training-a_player-z'), {
+        sessionId: 'training-a',
+        playerId: 'player-z',
+        status: 'PRESENT',
+      }),
+    )
+    await assertFails(getDoc(doc(db, 'attendance/training-a_player-z')))
+  })
+
+  it('refuse un utilisateur désactivé', async () => {
+    const db = testEnv.authenticatedContext('user-disabled').firestore()
+    await assertFails(getDoc(doc(db, 'sessions/training-a')))
+    await assertFails(getDoc(doc(db, 'attendance/training-a_player-a')))
   })
 })
 

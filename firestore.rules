@@ -82,6 +82,30 @@ service cloud.firestore {
         && seasonId == context.activeSeasonId;
     }
 
+    function isActiveAttendanceCategory(categoryId, seasonId) {
+      let context = user().data.securityContext;
+      let team = get(/databases/$(database)/documents/teams/$(context.activeTeamId));
+      return canInActiveSecurityContext('attendance.read')
+        && team.data.status == 'ACTIVE'
+        && team.data.categoryId == categoryId
+        && seasonId == context.activeSeasonId;
+    }
+
+    function canReadAttendanceForSession(sessionId, playerId) {
+      let context = user().data.securityContext;
+      let session = get(/databases/$(database)/documents/sessions/$(sessionId));
+      return isActiveAttendanceCategory(
+          session.data.categoryId,
+          session.data.seasonId
+        )
+        && session.data.status == 'COMPLETED'
+        && activePlayerScope(
+          playerId,
+          context.activeTeamId,
+          context.activeSeasonId
+        );
+    }
+
     function isActiveTestsSubCategory(subCategoryId, seasonId) {
       let context = user().data.securityContext;
       let team = get(/databases/$(database)/documents/teams/$(context.activeTeamId));
@@ -365,6 +389,28 @@ service cloud.firestore {
 
     match /playerAccessScopes/{scopeId} {
       allow read, write: if false;
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if resource.data.status == 'COMPLETED'
+        && isActiveAttendanceCategory(
+          resource.data.categoryId,
+          resource.data.seasonId
+        );
+    }
+
+    match /sessionParticipants/{participantId} {
+      allow read: if canReadAttendanceForSession(
+        resource.data.sessionId,
+        resource.data.playerId
+      );
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if canReadAttendanceForSession(
+        resource.data.sessionId,
+        resource.data.playerId
+      );
     }
 
     match /players/{playerId} {

@@ -1777,3 +1777,29 @@ devenue obsolète ne doit ni remplacer le contexte sélectionné ni purger ses
 queries protégées. Seule la réponse correspondant exactement au rôle, à la Team
 et à la saison actuellement sélectionnés peut appliquer la mise à jour de cache
 et le nettoyage associé.
+
+# Addendum PR13 — Présences dans la fiche joueuse
+
+La section `PlayerAttendanceSection` est indépendante de l'identité et des
+Tests. Elle utilise la permission canonique `attendance.read` et une clé de
+cache `uid + activeRoleId + teamId + seasonId + playerId`.
+
+La population attendue reste celle de `SessionParticipant`. Le repository lit
+d'abord uniquement les Sessions `COMPLETED` de la saison et de la Category
+actives, puis charge par lots d'identifiants déterministes
+`sessionId_playerId` les `SessionParticipant` et `Attendance` de la joueuse.
+Cette stratégie évite un chargement de toutes les Attendance de la Team, les
+N+1 et toute dénormalisation concurrente de `teamId` ou `seasonId` dans
+Attendance. Elle nécessite l'index Sessions
+`seasonId + categoryId + status + startDateTime desc`.
+
+La nomenclature canonique reste `PRESENT`, `LATE`, `ABSENT_JUSTIFIED`,
+`ABSENT_UNJUSTIFIED`, `INJURED`, `SICK`, `EXTERNAL_PROGRAM`, `EXCUSED`.
+Conformément à BR-048 à BR-050, seules `PRESENT` et `LATE` sont des présences
+physiques. Le taux est `présences physiques / Sessions où la joueuse était
+attendue × 100`; une Attendance manquante reste signalée comme non renseignée,
+mais la Session attendue demeure dans le dénominateur.
+
+Les mutations Présences futures doivent appeler l'invalidation ciblée de la
+synthèse de la joueuse concernée. Il n'existe encore aucune mutation Attendance
+sur `dev` à raccorder dans cette PR.

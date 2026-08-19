@@ -44,6 +44,24 @@ export const queryKeys = {
         birthYear,
       ] as const,
   },
+  attendance: {
+    playerSummary: (
+      uid: string,
+      roleId: string,
+      teamId: string,
+      seasonId: string,
+      playerId: string,
+    ) =>
+      [
+        'attendance',
+        'playerSummary',
+        uid,
+        roleId,
+        teamId,
+        seasonId,
+        playerId,
+      ] as const,
+  },
   tests: {
     catalogue: (
       uid: string,
